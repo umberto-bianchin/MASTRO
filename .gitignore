@@ -1,0 +1,17 @@
+
+.DS_Store
+MASTRO/test_convres.txt
+MASTRO/test_final.txt
+MASTRO/test_filtered.txt
+MASTRO/lcm53/lcm-out-test_ids.txt
+MASTRO/lcm53/table-file-test.txt
+MASTRO/lcm53/lcm-out-test.txt
+.vscode/settings.json
+MASTRO/test_theta0.6_st2_thetamax.txt
+MASTRO/minptest.csv
+MASTRO/minptest.csv.lock
+MASTRO/results_*
+MASTRO/lcm53/lcm-out*
+MASTRO/lcm53/table-file*
+MASTRO/spurious_analysis
+MASTRO/test
