@@ -239,7 +239,7 @@ def run_transnum(lcmdir: Path, table_file_ids: Path, graphs_txt: Path,
 
 
 def run_lcm(lcmdir: Path, file_graphs_ids: Path, sigma, output_lcm: Path,
-            log_path: Path, weights_txt: Path = None):
+            log_path: Path, weights_txt: Path | None = None):
     """Invoke LCM for (weighted) frequent itemset mining.
 
     Flags: F = frequent itemsets, f = output frequencies, I = output transaction IDs.
@@ -249,7 +249,12 @@ def run_lcm(lcmdir: Path, file_graphs_ids: Path, sigma, output_lcm: Path,
     cmd = [str(lcmdir / "lcm"), "FfI"]
     if weights_txt is not None:
         cmd += ["-w", str(weights_txt)]
-    cmd += [str(file_graphs_ids), str(sigma), str(output_lcm)]
+        # LCM accumulates 1/M_i weights via sequential addition in C
+        # A 1e-9 tolerance is negligible relative to any real support difference.
+        effective_sigma = float(sigma) - 1e-9
+    else:
+        effective_sigma = sigma
+    cmd += [str(file_graphs_ids), str(effective_sigma), str(output_lcm)]
 
     print("[CMD]", " ".join(cmd), ">", str(log_path), "2>&1")
     with open(log_path, "w") as logf:
@@ -258,9 +263,9 @@ def run_lcm(lcmdir: Path, file_graphs_ids: Path, sigma, output_lcm: Path,
 
 def run_lcm_limited(lcmdir: Path, file_graphs_ids: Path, sigma,
                     output_lcm: Path, log_path: Path,
-                    weights_txt: Path = None,
-                    max_itemsets: int = None,
-                    timeout_sec: int = None):
+                    weights_txt: Path | None = None,
+                    max_itemsets: int | None = None,
+                    timeout_sec: int | None = None):
     """Invoke LCM with optional solution cap (-# flag) and timeout.
 
     Returns a dict:
@@ -273,9 +278,12 @@ def run_lcm_limited(lcmdir: Path, file_graphs_ids: Path, sigma,
     cmd = [str(lcmdir / "lcm"), "FfI"]
     if weights_txt is not None:
         cmd += ["-w", str(weights_txt)]
+        effective_sigma = float(sigma) - 1e-9
+    else:
+        effective_sigma = sigma
     if max_itemsets is not None:
         cmd += ["-#", str(max_itemsets)]
-    cmd += [str(file_graphs_ids), str(sigma), str(output_lcm)]
+    cmd += [str(file_graphs_ids), str(effective_sigma), str(output_lcm)]
 
     print("[CMD]", " ".join(cmd), ">", str(log_path), "2>&1")
 
@@ -501,5 +509,6 @@ def compute_theta_support(occ_ids, weights, owner0, n_patients, K, theta):
     for t in occ_ids:
         if 0 <= t < K:
             pi[owner0[t]] += weights[t]
-    s_theta = sum(1 for val in pi if val >= theta)
+    # 1e-9 tolerance absorbs floating-point accumulation error
+    s_theta = sum(1 for val in pi if val >= theta - 1e-9)
     return s_theta, pi
