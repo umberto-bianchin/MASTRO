@@ -1,16 +1,17 @@
+#python3 run_pipeline.py --graphs ../data/TRACERx/graphs_tracerx.txt --owner ../data/TRACERx/owner_tracerx.txt --sigma 2 --theta_list 0.25,0.5,0.75,1.0 --significance --sig_null indep --outdir tracerx_results_2
 # =============================================================================
 # Breast Cancer Experiment Runner
 #
-# End-to-end orchestrator that loads a .npy dataset, builds the
+# End-to-end orchestrator that loads a dataset, builds the
 # MASTRO input files, and runs all four algorithm variants:
 #
-#   Algorithm 0  –  Random sampling (one tree per patient, unweighted FIM)
-#   Algorithm 1  –  Expected support (all trees, weighted FIM, w_t = 1/M_i)
-#   Algorithm 2  –  θ-frequent post-filter  (on top of Alg 1 output)
-#   Algorithm 3  –  θ-maximal  post-filter  (on top of Alg 1 output)
+#   Algorithm 0  -  Random sampling (one tree per patient, unweighted FIM)
+#   Algorithm 1  -  Expected support (all trees, weighted FIM, w_t = 1/M_i)
+#   Algorithm 2  -  theta-frequent post-filter  (on top of Alg 1 output)
+#   Algorithm 3  -  theta-maximal  post-filter  (on top of Alg 1 output)
 #
 # After mining, the results are compared via Jaccard similarity and unique-
-# pattern analysis.
+# pattern analysis
 #
 # Usage:
 #   python3 breastCancer_experiments.py --npy ../data/breastCancer.npy --sigma 10 --seed 0 --theta_list 0.25,0.5,0.75,1.0
@@ -19,7 +20,10 @@
 import argparse
 import json
 from pathlib import Path
+from typing import Optional
+from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
+import numpy as np
 from utils import (
     SCRIPT_DIR,
     ensure_dir,
@@ -35,10 +39,10 @@ from utils import (
 # -------------------------
 # Run pipelines
 # -------------------------
-def run_pipeline(graphs_txt: Path, sigma: float, lcmdir: Path, workdir: Path, tag: str, weights_txt: Path = None, weighted: bool = False):
-    """Algorithm 0-1 pipeline: FIM on one-tree-per-patient/all trees data.
+def run_pipeline(graphs_txt: Path, sigma: float, lcmdir: Path, workdir: Path, tag: str, weights_txt: Optional[Path] = None, weighted: bool = False):
+    """Algorithm 0-1 pipeline: FIM on one-tree-per-patient/all trees data
 
-    Steps:  transnum → LCM (no -w) → convert_results → filter_results
+    Steps:  transnum -> LCM (no -w) -> convert_results -> filter_results
     """
     ensure_dir(workdir)
 
@@ -73,10 +77,10 @@ def run_pipeline(graphs_txt: Path, sigma: float, lcmdir: Path, workdir: Path, ta
     return results_filtered
 
 def run_postfilters(expected_filtered: Path, weights_txt: Path, owner_txt: Path, theta: float, st: int, workdir: Path, tag: str):
-    """Stage-2 post-filters (Algorithms 2 and 3) on already-filtered Alg-1 output.
+    """Stage-2 post-filters (Algorithms 2 and 3) on already-filtered Alg-1 output
 
-    Runs both Algorithm 2 (θ-frequent) and Algorithm 3 (θ-maximal),
-    returning the paths to both output files.
+    Runs both Algorithm 2 (theta-frequent) and Algorithm 3 (theta-maximal),
+    returning the paths to both output files
     """
     out_alg2 = workdir / f"{tag}_alg2_theta{theta}_st{st}.txt"
     out_alg3 = workdir / f"{tag}_alg3_theta{theta}_st{st}.txt"
@@ -102,10 +106,105 @@ def run_postfilters(expected_filtered: Path, weights_txt: Path, owner_txt: Path,
 
 
 # -------------------------
+# Significance stage
+# -------------------------
+def _run_sig(input_path, output_path, npy_path, graphs_all_path,
+             weights_txt, owner_txt,
+             test, null_model, mc_cutoff, mc_samples, seed, theta=None):
+    """Invoke compute_significance_ensemble.py for one (filtered file, test) pair"""
+    cmd = [
+        "python3", str(SCRIPT_DIR / "compute_significance_ensemble.py"),
+        "-i", str(input_path),
+        "-o", str(output_path),
+        "-w", str(weights_txt),
+        "--owner", str(owner_txt),
+        "--test", test,
+        "--null", null_model,
+        "--mc_cutoff", str(mc_cutoff),
+        "--mc_samples", str(mc_samples),
+        "--seed", str(seed),
+    ]
+    if npy_path is not None:
+        cmd += ["--npy", str(npy_path)]
+    else:
+        cmd += ["--graphs_all", str(graphs_all_path)]
+    if theta is not None:
+        cmd += ["--theta", str(theta)]
+    run_cmd(cmd)
+
+
+def run_significance_tests(sig_dir, npy_path, npy_sampled_path,
+                           graphs_all_path, graphs_sampled_path,
+                           weights_txt, owner_txt,
+                           weights_sampled_txt, owner_sampled_txt,
+                           alg0_filtered, alg1_filtered, alg2_paths, alg3_paths,
+                           thetas, null_model, mc_cutoff, mc_samples, seed, n_jobs=1):
+    """Run significance tests on every pipeline output
+
+    Alg 0 uses the sampled weights/owner (1.0 per patient, 1 transaction per patient)
+    Alg 1/2/3 use the uniform weights/owner (1/M_i per tree, M_i transactions per patient)
+
+    Either npy_path or graphs_all_path must be set (not both)
+    """
+    jobs = []
+
+    # Alg 0 -> expected-support test, with ITS OWN weights/owner
+    out = sig_dir / "alg0_mastro_random_pvalues_exp.csv"
+    jobs.append(dict(
+        input_path=alg0_filtered, output_path=out,
+        npy_path=npy_sampled_path,
+        graphs_all_path=graphs_sampled_path,
+        weights_txt=weights_sampled_txt, owner_txt=owner_sampled_txt,
+        test="exp", null_model=null_model,
+        mc_cutoff=mc_cutoff, mc_samples=mc_samples, seed=seed,
+    ))
+
+    # Alg 1 -> expected-support test, with uniform weights/owner
+    out = sig_dir / "alg1_expected_uniform_pvalues_exp.csv"
+    jobs.append(dict(
+        input_path=alg1_filtered, output_path=out,
+        npy_path=npy_path,
+        graphs_all_path=graphs_all_path,
+        weights_txt=weights_txt, owner_txt=owner_txt,
+        test="exp", null_model=null_model,
+        mc_cutoff=mc_cutoff, mc_samples=mc_samples, seed=seed,
+    ))
+
+    # Alg 2 / Alg 3 -> theta-consensus test, once per theta
+    for th in thetas:
+        for prefix, paths in [("alg2", alg2_paths), ("alg3", alg3_paths)]:
+            key = f"{prefix}_theta{th}"
+            if key not in paths:
+                continue
+            out = sig_dir / f"{key}_pvalues_theta.csv"
+            jobs.append(dict(
+                input_path=paths[key], output_path=out,
+                npy_path=npy_path,
+                graphs_all_path=graphs_all_path,
+                weights_txt=weights_txt, owner_txt=owner_txt,
+                test="theta", null_model=null_model,
+                mc_cutoff=mc_cutoff, mc_samples=mc_samples, seed=seed,
+                theta=th,
+            ))
+
+    print(f"[INFO] Launching {len(jobs)} significance tests with {n_jobs} outer workers")
+
+    if n_jobs > 1:
+        with ProcessPoolExecutor(max_workers=n_jobs) as ex:
+            list(ex.map(_run_sig_kwargs, jobs))
+    else:
+        for j in jobs:
+            _run_sig(**j)
+
+def _run_sig_kwargs(kw):
+    """Wrapper so ProcessPoolExecutor can pickle the call"""
+    _run_sig(**kw)
+
+# -------------------------
 # Result comparison
 # -------------------------
 def compare_results(result_paths: dict, outdir: Path):
-    """Compare mined pattern sets across all algorithm variants.
+    """Compare mined pattern sets across all algorithm variants
 
     Outputs:
       - comparison_summary.json : pattern count per method
@@ -152,17 +251,33 @@ def compare_results(result_paths: dict, outdir: Path):
 # -------------------------
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--npy", required=True, help="Path to breastCancer.npy")
+    input_grp = ap.add_mutually_exclusive_group(required=True)
+    input_grp.add_argument("--npy", help="Path to .npy dataset (object array data[patient][tree][edge]=[parent,child])")
+    input_grp.add_argument("--graphs", help="Path to a .txt file where each line is a pre-computed transaction")
+    ap.add_argument("--owner", default=None,
+                    help="Owner file for --graphs mode: one patient-ID per line (same #lines as graphs). "
+                         "If omitted, each line is treated as a separate patient (1 tree per patient)")
     ap.add_argument("--sigma", type=int, default=10, help="Support threshold sigma")
     ap.add_argument("--seed", type=int, default=0, help="Random seed for picking one tree per patient")
     ap.add_argument("--theta_list", default="0.25,0.5,0.75,1.0", help="Comma-separated list of theta values")
     ap.add_argument("--lcmdir", default="./lcm53", help="Path to lcm53 directory")
     ap.add_argument("--outdir", default=None, help="Output directory (default: results_<timestamp>)")
     ap.add_argument("--keep_gl", action="store_true", help="Keep GL in stats and transactions")
+    ap.add_argument("--significance", action="store_true",
+                    help="Run ensemble significance tests after mining "
+                         "(exp test on alg0/alg1, theta test on alg2/alg3)")
+    ap.add_argument("--sig_null", choices=["indep", "perm"], default="perm",
+                    help="Null model for significance testing (default: perm)")
+    ap.add_argument("--sig_mc_cutoff", type=int, default=8,
+                    help="M_i above which to use MC in significance testing")
+    ap.add_argument("--sig_mc_samples", type=int, default=10000,
+                    help="Monte-Carlo samples per patient in significance testing")
+    ap.add_argument("--sig_n_jobs", type=int, default=1,
+                    help="Parallel workers for per-patient phi_i computation "
+                         "in significance testing (default 1 = sequential)")
     args = ap.parse_args()
 
     lcmdir = Path(args.lcmdir).resolve()
-    npy_path = Path(args.npy).resolve()
     drop_gl = not args.keep_gl
 
     if args.outdir is None:
@@ -172,19 +287,116 @@ def main():
         outdir = Path(args.outdir).resolve()
     ensure_dir(outdir)
 
-    data = load_npy(npy_path)
-    patients_trees = list(data)
-
-    stats = compute_dataset_stats(patients_trees, drop_gl=drop_gl)
-    (outdir / "dataset_stats.json").write_text(json.dumps(stats, indent=2))
-    print("[OK] Dataset stats written to", outdir / "dataset_stats.json")
-
     inputs_dir = outdir / "inputs"
     ensure_dir(inputs_dir)
 
-    graphs_all, weights_uniform, owner_txt, graphs_sampled = build_inputs(
-        patients_trees, inputs_dir, seed=args.seed, drop_gl=drop_gl
-    )
+    npy_path = None
+    npy_sampled_path = None
+
+    if args.npy:
+        npy_path = Path(args.npy).resolve()
+        data = load_npy(npy_path)
+        patients_trees = list(data)
+
+        stats = compute_dataset_stats(patients_trees, drop_gl=drop_gl)
+        (outdir / "dataset_stats.json").write_text(json.dumps(stats, indent=2))
+        print("[OK] Dataset stats written to", outdir / "dataset_stats.json")
+
+        graphs_all, weights_uniform, owner_txt, graphs_sampled = build_inputs(
+            patients_trees, inputs_dir, seed=args.seed, drop_gl=drop_gl
+        )
+
+        # Build sampled weights/owner and sampled .npy for significance
+        weights_sampled_txt = inputs_dir / "weights_sampled.txt"
+        owner_sampled_txt = inputs_dir / "owner_sampled.txt"
+        with weights_sampled_txt.open("w") as fw, owner_sampled_txt.open("w") as fo:
+            for i, tlist in enumerate(patients_trees):
+                if not tlist:
+                    continue
+                fw.write("1.0\n")
+                fo.write(f"{i}\n")
+
+        npy_sampled_path = inputs_dir / "sampled.npy"
+        rng_sample = np.random.default_rng(args.seed)
+        n = len(patients_trees)
+        sampled_data = np.empty(n, dtype=object)
+        for i, tlist in enumerate(patients_trees):
+            if not tlist:
+                sampled_data[i] = np.empty((0, 2), dtype=object)
+                continue
+            j = int(rng_sample.integers(0, len(tlist)))
+            sampled_data[i] = np.array([tlist[j]], dtype=object)
+        np.save(npy_sampled_path, sampled_data, allow_pickle=True)
+        print(f"[OK] Sampled .npy with 1 tree/patient written to {npy_sampled_path}")
+
+    else:
+        graphs_src = Path(args.graphs).resolve()
+        lines = [l.rstrip("\n") for l in graphs_src.open()]
+        n_lines = len(lines)
+
+        if args.owner:
+            owner_ids = [l.strip() for l in open(args.owner)]
+            assert len(owner_ids) == n_lines, (
+                f"owner file has {len(owner_ids)} lines but graphs has {n_lines}")
+            # Map owner labels -> 0-based patient indices (preserve order of first appearance)
+            label_to_idx = {}
+            for lab in owner_ids:
+                if lab not in label_to_idx:
+                    label_to_idx[lab] = len(label_to_idx)
+            owner_ints = [label_to_idx[lab] for lab in owner_ids]
+        else:
+            # 1 tree per patient
+            owner_ints = list(range(n_lines))
+
+        n_patients = max(owner_ints) + 1
+        # Group lines by patient
+        patient_lines = [[] for _ in range(n_patients)]
+        for idx, line in zip(owner_ints, lines):
+            patient_lines[idx].append(line)
+
+        # Write graphs_all.txt, weights, owner
+        graphs_all = inputs_dir / "graphs_all.txt"
+        weights_uniform = inputs_dir / "weights_uniform.txt"
+        owner_txt = inputs_dir / "owner.txt"
+        with graphs_all.open("w") as fg, weights_uniform.open("w") as fw, owner_txt.open("w") as fo:
+            for pid, plines in enumerate(patient_lines):
+                Mi = len(plines)
+                w = 1.0 / Mi
+                for line in plines:
+                    fg.write(line + "\n")
+                    fw.write(f"{w}\n")
+                    fo.write(f"{pid}\n")
+
+        # Write graphs_sampled.txt (one random tree per patient)
+        graphs_sampled = inputs_dir / "graphs_sampled.txt"
+        rng_sample = np.random.default_rng(args.seed)
+        with graphs_sampled.open("w") as fs:
+            for plines in patient_lines:
+                j = int(rng_sample.integers(0, len(plines)))
+                fs.write(plines[j] + "\n")
+
+        # Sampled weights/owner (1 per patient, weight=1.0)
+        weights_sampled_txt = inputs_dir / "weights_sampled.txt"
+        owner_sampled_txt = inputs_dir / "owner_sampled.txt"
+        with weights_sampled_txt.open("w") as fw, owner_sampled_txt.open("w") as fo:
+            for pid in range(n_patients):
+                fw.write("1.0\n")
+                fo.write(f"{pid}\n")
+
+        # Basic stats for .txt mode
+        stats = {
+            "n_patients": n_patients,
+            "n_transactions": n_lines,
+            "trees_per_patient": {
+                "min": int(min(len(pl) for pl in patient_lines)),
+                "median": float(np.median([len(pl) for pl in patient_lines])),
+                "max": int(max(len(pl) for pl in patient_lines)),
+                "mean": float(np.mean([len(pl) for pl in patient_lines])),
+            },
+            "input_mode": "graphs_txt",
+        }
+        (outdir / "dataset_stats.json").write_text(json.dumps(stats, indent=2))
+        print(f"[OK] Loaded {n_lines} transactions for {n_patients} patients from {graphs_src.name}")
 
     runs_dir = outdir / "runs"
     ensure_dir(runs_dir)
@@ -214,8 +426,7 @@ def main():
         weighted=True
     )
 
-    # --- Algorithms 2 & 3: θ-frequent / θ-maximal post-filters ---
-    # Run for each θ value in the user-supplied list.
+    # --- Algorithms 2 & 3: theta-frequent / theta-maximal post-filters ---
     alg23_dir = runs_dir / "alg2_alg3_postfilters"
     ensure_dir(alg23_dir)
     alg2_paths = {}
@@ -244,6 +455,35 @@ def main():
         **alg3_paths,
     }
     compare_results(result_paths, analysis_dir)
+
+    if args.significance:
+        sig_dir = outdir / "significance"
+        ensure_dir(sig_dir)
+        # In --npy mode: npy_path/npy_sampled_path are set, graphs_all_path is None
+        # In --graphs mode: vice-versa
+        graphs_all_path = None if npy_path else graphs_all
+        graphs_sampled_path = None if npy_path else graphs_sampled
+        run_significance_tests(
+            sig_dir=sig_dir,
+            npy_path=npy_path,
+            npy_sampled_path=npy_sampled_path,
+            graphs_all_path=graphs_all_path,
+            graphs_sampled_path=graphs_sampled_path,
+            weights_txt=weights_uniform,
+            owner_txt=owner_txt,
+            weights_sampled_txt=weights_sampled_txt,
+            owner_sampled_txt=owner_sampled_txt,
+            alg0_filtered=alg0_filtered,
+            alg1_filtered=alg1_filtered,
+            alg2_paths=alg2_paths,
+            alg3_paths=alg3_paths,
+            thetas=thetas,
+            null_model=args.sig_null,
+            mc_cutoff=args.sig_mc_cutoff,
+            mc_samples=args.sig_mc_samples,
+            seed=args.seed,
+            n_jobs=args.sig_n_jobs,
+        )
 
     print("\n[DONE] Outputs are under:", outdir)
 
