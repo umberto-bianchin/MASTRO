@@ -1,12 +1,14 @@
 # =============================================================================
-# MASTRO Shared Utilities
+# Shared utilities for the ensemble mining pipeline.
 #
-# Common functions and constants used across multiple MASTRO scripts:
-#   - breastCancer_experiments.py
-#   - analyze_spurious_itemsets.py
-#   - patient_mutset.py
-#   - postfilter_theta.py
-#   - postfilter_theta_maximal.py
+# Single source of truth for the constants and helper functions used across the
+# pipeline, so the individual scripts import from here instead of re-implementing:
+#   - dataset loading and the tree -> transaction encoding (edge items);
+#   - building the mining inputs (pooled graphs, per-tree weights, owner labels,
+#     and a one-tree-per-patient sample);
+#   - invoking the external tools (transnum.pl and the LCM binary);
+#   - parsing LCM output (alternating pattern / occurrence lines, itemsets);
+#   - the theta-support computation shared by the post-filters.
 # =============================================================================
 
 import re
@@ -33,6 +35,17 @@ EDGE_SEPARATORS = ["->-", "-/-", "-?-"]
 SCRIPT_DIR = Path(__file__).resolve().parent
 """Directory containing the MASTRO scripts (for locating convert_results.py etc.)."""
 
+VERBOSE = True
+"""When False, the LCM/subprocess helpers stop echoing '[CMD] ...' lines and
+silence the child stdout. Resampling drivers switch this off so their logs show
+a clean progress counter instead of per-command spam. Set via set_verbose()."""
+
+
+def set_verbose(flag: bool):
+    """Toggle command echoing / child-stdout for the run_* helpers."""
+    global VERBOSE
+    VERBOSE = bool(flag)
+
 
 # =====================================================================
 # General helpers
@@ -42,10 +55,19 @@ def ensure_dir(p: Path):
     p.mkdir(parents=True, exist_ok=True)
 
 
-def run_cmd(cmd, cwd=None):
-    """Execute a shell command, printing it first for logging."""
-    print("[CMD]", " ".join(map(str, cmd)))
-    subprocess.run(cmd, cwd=cwd, check=True)
+def run_cmd(cmd, cwd=None, silent=None):
+    """Execute a shell command, printing it first for logging.
+
+    Echoes '[CMD] ...' only when VERBOSE. *silent* controls the child's stdout:
+    when None it defaults to (not VERBOSE), so quiet mode also swallows the
+    child's stdout while keeping stderr for tracebacks.
+    """
+    if VERBOSE:
+        print("[CMD]", " ".join(map(str, cmd)))
+    if silent is None:
+        silent = not VERBOSE
+    subprocess.run(cmd, cwd=cwd, check=True,
+                   stdout=(subprocess.DEVNULL if silent else None))
 
 
 def load_npy(path: Path):
@@ -229,8 +251,9 @@ def run_transnum(lcmdir: Path, table_file_ids: Path, graphs_txt: Path,
     version to stdout, while accumulating the label->ID mapping in
     *table_file_ids*.
     """
-    print("[CMD] perl", str(lcmdir / "transnum.pl"), str(table_file_ids),
-          "<", str(graphs_txt), ">", str(file_graphs_ids))
+    if VERBOSE:
+        print("[CMD] perl", str(lcmdir / "transnum.pl"), str(table_file_ids),
+              "<", str(graphs_txt), ">", str(file_graphs_ids))
     with open(graphs_txt, "r") as fin, open(file_graphs_ids, "w") as fout:
         subprocess.run(
             ["perl", str(lcmdir / "transnum.pl"), str(table_file_ids)],
@@ -256,7 +279,8 @@ def run_lcm(lcmdir: Path, file_graphs_ids: Path, sigma, output_lcm: Path,
         effective_sigma = sigma
     cmd += [str(file_graphs_ids), str(effective_sigma), str(output_lcm)]
 
-    print("[CMD]", " ".join(cmd), ">", str(log_path), "2>&1")
+    if VERBOSE:
+        print("[CMD]", " ".join(cmd), ">", str(log_path), "2>&1")
     with open(log_path, "w") as logf:
         subprocess.run(cmd, stdout=logf, stderr=logf, check=True)
 
@@ -285,7 +309,8 @@ def run_lcm_limited(lcmdir: Path, file_graphs_ids: Path, sigma,
         cmd += ["-#", str(max_itemsets)]
     cmd += [str(file_graphs_ids), str(effective_sigma), str(output_lcm)]
 
-    print("[CMD]", " ".join(cmd), ">", str(log_path), "2>&1")
+    if VERBOSE:
+        print("[CMD]", " ".join(cmd), ">", str(log_path), "2>&1")
 
     t0 = time.time()
     timed_out = False

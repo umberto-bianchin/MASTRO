@@ -1,21 +1,32 @@
-#python3 run_pipeline.py --graphs ../data/TRACERx/graphs_tracerx.txt --owner ../data/TRACERx/owner_tracerx.txt --sigma 2 --theta_list 0.25,0.5,0.75,1.0 --significance --sig_null indep --outdir tracerx_results_2
-# =============================================================================
-# Breast Cancer Experiment Runner
-#
-# End-to-end orchestrator that loads a dataset, builds the
-# MASTRO input files, and runs all four algorithm variants:
-#
-#   Algorithm 0  -  Random sampling (one tree per patient, unweighted FIM)
-#   Algorithm 1  -  Expected support (all trees, weighted FIM, w_t = 1/M_i)
-#   Algorithm 2  -  theta-frequent post-filter  (on top of Alg 1 output)
-#   Algorithm 3  -  theta-maximal  post-filter  (on top of Alg 1 output)
-#
-# After mining, the results are compared via Jaccard similarity and unique-
-# pattern analysis
-#
-# Usage:
-#   python3 breastCancer_experiments.py --npy ../data/breastCancer.npy --sigma 10 --seed 0 --theta_list 0.25,0.5,0.75,1.0
-# =============================================================================
+"""End-to-end runner for the ensemble MASTRO pipeline.
+
+Given a dataset (either a .npy object array indexed data[patient][tree][edge] =
+[parent, child], or a pre-built graphs .txt plus an owner file), this script
+builds the transaction inputs and mines four families of trajectories:
+
+  Algorithm 0 : single-tree baseline. One tree per patient is sampled at random
+                and mined with unweighted frequent-itemset mining.
+  Algorithm 1 : expected support. All candidate trees are pooled, each weighted
+                by 1/M_i (M_i is the number of trees of patient i), and mined
+                with weighted frequent-itemset mining.
+  Algorithm 2 : theta-frequent post-filter applied on top of Algorithm 1.
+  Algorithm 3 : theta-maximal post-filter applied on top of Algorithm 1.
+
+The four mined families are then compared (Jaccard similarity, per-method unique
+patterns). With --significance every family is scored under the ensemble null
+(compute_significance_ensemble.py): the expected-support test on Alg 0 and Alg 1,
+the theta-consensus test on Alg 2 and Alg 3. With --single_tree_only only
+Algorithm 0 is built, mined and scored; the seed-independent ensemble families
+(Alg 1/2/3) are skipped, which is what the single-tree seed sweep needs since
+those families would be recomputed identically for every seed.
+
+Every stage skips itself when its output file already exists, so an interrupted
+run can be resumed by re-invoking it with the same --outdir.
+
+Example:
+  python3 run_pipeline.py --npy ../data/breastCancer.npy --sigma 5 --seed 0 \\
+      --theta_list 0.5,1.0 --significance --sig_null perm
+"""
 
 import argparse
 import json
@@ -46,9 +57,12 @@ def run_pipeline(graphs_txt: Path, sigma: float, lcmdir: Path, workdir: Path, ta
     """
     ensure_dir(workdir)
 
-    table_file_ids = lcmdir / f"table-file-{graphs_txt.name}"
-    file_graphs_ids = lcmdir / f"lcm-out-{graphs_txt.stem}_ids.txt"
-    output_lcm = lcmdir / f"lcm-out-{graphs_txt.name}"
+    # LCM scratch files live in this run's workdir (not the shared lcmdir), so
+    # independent pipelines can mine from the same folder in parallel without
+    # clobbering each other's table-file / lcm-out intermediates.
+    table_file_ids = workdir / f"table-file-{graphs_txt.name}"
+    file_graphs_ids = workdir / f"lcm-out-{graphs_txt.stem}_ids.txt"
+    output_lcm = workdir / f"lcm-out-{graphs_txt.name}"
 
     results_converted = workdir / f"{tag}_convres.txt"
     results_filtered = workdir / f"{tag}_filtered.txt"
@@ -110,7 +124,7 @@ def run_postfilters(expected_filtered: Path, weights_txt: Path, owner_txt: Path,
 # -------------------------
 def _run_sig(input_path, output_path, npy_path, graphs_all_path,
              weights_txt, owner_txt,
-             test, null_model, mc_cutoff, mc_samples, seed, theta=None):
+             test, null_model, mc_cutoff, mc_samples, seed, theta=None, n_jobs=1):
     """Invoke compute_significance_ensemble.py for one (filtered file, test) pair"""
     cmd = [
         "python3", str(SCRIPT_DIR / "compute_significance_ensemble.py"),
@@ -123,6 +137,7 @@ def _run_sig(input_path, output_path, npy_path, graphs_all_path,
         "--mc_cutoff", str(mc_cutoff),
         "--mc_samples", str(mc_samples),
         "--seed", str(seed),
+        "--n_jobs", str(n_jobs),
     ]
     if npy_path is not None:
         cmd += ["--npy", str(npy_path)]
@@ -138,7 +153,8 @@ def run_significance_tests(sig_dir, npy_path, npy_sampled_path,
                            weights_txt, owner_txt,
                            weights_sampled_txt, owner_sampled_txt,
                            alg0_filtered, alg1_filtered, alg2_paths, alg3_paths,
-                           thetas, null_model, mc_cutoff, mc_samples, seed, n_jobs=1):
+                           thetas, null_model, mc_cutoff, mc_samples, seed, n_jobs=1,
+                           single_tree_only=False):
     """Run significance tests on every pipeline output
 
     Alg 0 uses the sampled weights/owner (1.0 per patient, 1 transaction per patient)
@@ -158,6 +174,14 @@ def run_significance_tests(sig_dir, npy_path, npy_sampled_path,
         test="exp", null_model=null_model,
         mc_cutoff=mc_cutoff, mc_samples=mc_samples, seed=seed,
     ))
+
+    if single_tree_only:
+        # Only the single-tree baseline is scored; skip the ensemble families.
+        print(f"[INFO] Running {len(jobs)} significance test (single-tree only), "
+              f"{n_jobs} workers")
+        for j in jobs:
+            _run_sig(n_jobs=n_jobs, **j)
+        return
 
     # Alg 1 -> expected-support test, with uniform weights/owner
     out = sig_dir / "alg1_expected_uniform_pvalues_exp.csv"
@@ -187,18 +211,12 @@ def run_significance_tests(sig_dir, npy_path, npy_sampled_path,
                 theta=th,
             ))
 
-    print(f"[INFO] Launching {len(jobs)} significance tests with {n_jobs} outer workers")
-
-    if n_jobs > 1:
-        with ProcessPoolExecutor(max_workers=n_jobs) as ex:
-            list(ex.map(_run_sig_kwargs, jobs))
-    else:
-        for j in jobs:
-            _run_sig(**j)
-
-def _run_sig_kwargs(kw):
-    """Wrapper so ProcessPoolExecutor can pickle the call"""
-    _run_sig(**kw)
+    # Each significance job is itself parallel over trajectories (--n_jobs),
+    # so we run the (few) jobs sequentially and give every job the full worker
+    # budget rather than fanning out the handful of CSVs across a shallow pool.
+    print(f"[INFO] Running {len(jobs)} significance tests, {n_jobs} workers each")
+    for j in jobs:
+        _run_sig(n_jobs=n_jobs, **j)
 
 # -------------------------
 # Result comparison
@@ -266,6 +284,11 @@ def main():
     ap.add_argument("--significance", action="store_true",
                     help="Run ensemble significance tests after mining "
                          "(exp test on alg0/alg1, theta test on alg2/alg3)")
+    ap.add_argument("--single_tree_only", action="store_true",
+                    help="Only build/mine/score the single-tree baseline (Alg 0). "
+                         "Skips the seed-independent ensemble families (Alg 1/2/3) "
+                         "and their significance -- for the single-tree seed sweep, "
+                         "where redoing the ensemble every seed is pure waste.")
     ap.add_argument("--sig_null", choices=["indep", "perm"], default="perm",
                     help="Null model for significance testing (default: perm)")
     ap.add_argument("--sig_mc_cutoff", type=int, default=8,
@@ -306,7 +329,10 @@ def main():
             patients_trees, inputs_dir, seed=args.seed, drop_gl=drop_gl
         )
 
-        # Build sampled weights/owner and sampled .npy for significance
+        # Alg 0 (single-tree baseline) is scored as an ensemble of size one per
+        # patient: exactly one transaction per patient, with weight 1.0. We build
+        # a dedicated one-tree-per-patient .npy and matching weights/owner files so
+        # the significance test sees the sampled family, not the pooled ensemble.
         weights_sampled_txt = inputs_dir / "weights_sampled.txt"
         owner_sampled_txt = inputs_dir / "owner_sampled.txt"
         with weights_sampled_txt.open("w") as fw, owner_sampled_txt.open("w") as fo:
@@ -414,46 +440,52 @@ def main():
         tag="mastro_random"
     )
 
-    # --- Algorithm 1: all trees, weighted FIM (expected support) ---
-    alg1_dir = runs_dir / "alg1_expected_uniform"
-    alg1_filtered = run_pipeline(
-        graphs_txt=graphs_all,
-        sigma=float(sigma),
-        lcmdir=lcmdir,
-        workdir=alg1_dir,
-        tag="expected_uniform",
-        weights_txt=weights_uniform,
-        weighted=True
-    )
-
-    # --- Algorithms 2 & 3: theta-frequent / theta-maximal post-filters ---
-    alg23_dir = runs_dir / "alg2_alg3_postfilters"
-    ensure_dir(alg23_dir)
+    alg1_filtered = None
     alg2_paths = {}
     alg3_paths = {}
 
-    for th in thetas:
-        a2, a3 = run_postfilters(
-            expected_filtered=alg1_filtered,
+    if not args.single_tree_only:
+        # --- Algorithm 1: all trees, weighted FIM (expected support) ---
+        alg1_dir = runs_dir / "alg1_expected_uniform"
+        alg1_filtered = run_pipeline(
+            graphs_txt=graphs_all,
+            sigma=float(sigma),
+            lcmdir=lcmdir,
+            workdir=alg1_dir,
+            tag="expected_uniform",
             weights_txt=weights_uniform,
-            owner_txt=owner_txt,
-            theta=th,
-            st=sigma,
-            workdir=alg23_dir,
-            tag="expected_uniform"
+            weighted=True
         )
-        alg2_paths[f"alg2_theta{th}"] = a2
-        alg3_paths[f"alg3_theta{th}"] = a3
+
+        # --- Algorithms 2 & 3: theta-frequent / theta-maximal post-filters ---
+        alg23_dir = runs_dir / "alg2_alg3_postfilters"
+        ensure_dir(alg23_dir)
+
+        for th in thetas:
+            a2, a3 = run_postfilters(
+                expected_filtered=alg1_filtered,
+                weights_txt=weights_uniform,
+                owner_txt=owner_txt,
+                theta=th,
+                st=sigma,
+                workdir=alg23_dir,
+                tag="expected_uniform"
+            )
+            alg2_paths[f"alg2_theta{th}"] = a2
+            alg3_paths[f"alg3_theta{th}"] = a3
 
     analysis_dir = outdir / "analysis"
     ensure_dir(analysis_dir)
 
-    result_paths = {
-        "alg0_mastro_random": alg0_filtered,
-        "alg1_expected_uniform": alg1_filtered,
-        **alg2_paths,
-        **alg3_paths,
-    }
+    if args.single_tree_only:
+        result_paths = {"alg0_mastro_random": alg0_filtered}
+    else:
+        result_paths = {
+            "alg0_mastro_random": alg0_filtered,
+            "alg1_expected_uniform": alg1_filtered,
+            **alg2_paths,
+            **alg3_paths,
+        }
     compare_results(result_paths, analysis_dir)
 
     if args.significance:
@@ -483,6 +515,7 @@ def main():
             mc_samples=args.sig_mc_samples,
             seed=args.seed,
             n_jobs=args.sig_n_jobs,
+            single_tree_only=args.single_tree_only,
         )
 
     print("\n[DONE] Outputs are under:", outdir)

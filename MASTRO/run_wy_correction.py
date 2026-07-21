@@ -44,8 +44,10 @@ if args.par == 1:
 import pandas as pd
 import math
 df = pd.read_csv(args.minp,header=None)
-minpvals = df[0].values
-minpvals.sort()
+minpvals = sorted(df[0].dropna().astype(float).tolist())
+if not minpvals:
+    raise RuntimeError(f"No minimum p-values found in {args.minp}")
 print("minpvals",minpvals)
 for quant in [0.01 , 0.05 , 0.1]:
-    print(quant,"quant",minpvals[int(quant*int(args.m))])
+    idx = min(int(quant * len(minpvals)), len(minpvals) - 1)
+    print(quant,"quant",minpvals[idx])

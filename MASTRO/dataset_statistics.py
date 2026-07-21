@@ -1,3 +1,13 @@
+"""Print and save summary statistics for a .npy tree-ensemble dataset.
+
+Loads a dataset (object array indexed data[patient][tree][edge] = [parent,
+child]), computes the per-cohort statistics via utils.compute_dataset_stats
+(number of patients, trees-per-patient distribution, mutation counts, fraction
+of patients whose trees all share the same mutation set), prints a short summary
+including the trees-per-patient histogram, and writes the full statistics to a
+JSON file.
+"""
+
 import argparse
 import json
 from pathlib import Path
@@ -39,7 +49,7 @@ def main():
         stats["trees_per_patient_distribution"] = {
             str(k): v for k, v in sorted(dist.items())
         }
-        print("\n--- Distribution: #trees → #patients ---")
+        print("\n--- Distribution: #trees -> #patients ---")
         for n_trees, n_patients in sorted(dist.items()):
             bar = "#" * min(n_patients, 60)
             print(f"  {n_trees:4d} trees: {n_patients:5d} patients  {bar}")

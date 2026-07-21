@@ -41,6 +41,7 @@ import argparse
 import csv
 import itertools
 import math
+import multiprocessing
 from collections import Counter, defaultdict
 from concurrent.futures import ProcessPoolExecutor
 from fractions import Fraction
@@ -254,33 +255,42 @@ def compute_match_sets(placements, rel_tensor, expected):
 def compute_phi_i(rel_tensor, weights_i, pattern_items, alterations,
                   null_model, mc_cutoff, mc_samples, max_exact_placements,
                   L, rng):
-    """Compute patient-level phi_i by histogramming null placement match sets"""
+    """Compute patient-level phi_i by histogramming null placement match sets
+
+    Returns (phi, used_mc) where *used_mc* is True when the patient-level
+    distribution was estimated by Monte-Carlo sampling rather than exact
+    enumeration. Callers use this flag to apply the add-one Monte-Carlo
+    correction (B*p + 1)/(B + 1) to the aggregated p-value, which keeps an
+    MC-estimated tail valid (never exactly 0) and slightly conservative.
+    """
     M, n_alt, _ = rel_tensor.shape
     if M == 0 or n_alt == 0:
-        return {0: 1.0}
+        return {0: 1.0}, False
 
     # Transform trajectory in k x k matrix
     pnodes, expected = pattern_expected_matrix(pattern_items)
     k = len(pnodes)
     if k == 0 or k > n_alt:
-        return {0: 1.0}
+        return {0: 1.0}, False
 
     # Patient cannot generate this pattern under the null
     alt_set = set(alterations)
     if not all(node in alt_set for node in pnodes):
-        return {0: 1.0}
+        return {0: 1.0}, False
 
     # Build the null realizations h: pattern nodes -> patient alterations
     placements = None
+    used_mc = False
     if M <= mc_cutoff:
         placements = build_placements_exact(n_alt, k, null_model, max_exact_placements)
     if placements is None:
         placements = build_placements_mc(n_alt, k, mc_samples, null_model, rng)
+        used_mc = True
 
     # Number of exact placements or Monte-Carlo samples
     B_total = placements.shape[0]
     if B_total == 0:
-        return {0: 1.0}
+        return {0: 1.0}, False
 
     # For each placement h, compute J(h): matched candidate tree indices
     match_sets = compute_match_sets(placements, rel_tensor, expected)
@@ -299,7 +309,7 @@ def compute_phi_i(rel_tensor, weights_i, pattern_items, alterations,
         # Store phi_i on the L-scaled integer support grid
         exp = int(round(L * v))
         phi[exp] += rj
-    return dict(phi)
+    return dict(phi), used_mc
 
 
 # =====================================================================
@@ -317,7 +327,12 @@ def _phi_to_array(phi):
     return arr
 
 def convolve_phi(phis):
-    """Convolve all patient phi_i distributions into the cohort null"""
+    """Convolve all patient phi_i distributions into the cohort null.
+
+    Under the null the patients are independent, so the distribution of the
+    cohort support (the sum of the per-patient supports) is exactly the
+    convolution of the individual per-patient laws phi_i.
+    """
     F = np.array([1.0])
     for phi in phis:
         if not phi:
@@ -358,7 +373,15 @@ def compute_pvalue_pb(probs, k_obs):
 # Integer rescaling factor L
 # =====================================================================
 def compute_L(weights, cap):
-    """Compute the integer scaling factor used for weighted support bins"""
+    """Compute the integer scaling factor used for weighted support bins.
+
+    A weighted support is a sum of transaction weights, that is a sum of
+    fractions. To represent the null as a convolution on an integer grid every
+    weighted support must fall on an integer bin, so we scale by L = least common
+    multiple of the weight denominators; then L * (weighted support) is always an
+    integer. If the natural LCM would exceed *cap*, L is capped and the weights
+    are effectively rounded to 1/cap precision.
+    """
     L = 1
     for w in weights:
         if w <= 0:
@@ -407,23 +430,108 @@ def preprocess_patient_from_items(item_lines):
     rel_tensor = build_rel_tensor(trees_rel, alterations)
     return alterations, rel_tensor
 
-def _compute_phi_worker(args):
-    """Top-level worker so ProcessPoolExecutor can pickle it"""
-    (rel_tensor, weights_i, pattern_items, alterations, null_model,
-     mc_cutoff, mc_samples, max_exact_placements, L, seed) = args
-    rng = np.random.default_rng(seed)
-    return compute_phi_i(
-        rel_tensor=rel_tensor,
-        weights_i=weights_i,
-        pattern_items=pattern_items,
-        alterations=alterations,
-        null_model=null_model,
-        mc_cutoff=mc_cutoff,
-        mc_samples=mc_samples,
-        max_exact_placements=max_exact_placements,
-        L=L,
-        rng=rng,
+
+# =====================================================================
+# Per-trajectory processing (parallelised across trajectories)
+# =====================================================================
+# Shared read-only state, populated once in main() before the worker pool
+# is created. On Linux the pool is forked, so workers inherit this dict by
+# copy-on-write and none of the (large) relation tensors are ever pickled.
+_G = {}
+
+
+def _process_trajectory(task):
+    """Compute the p-value row for a single mined trajectory.
+
+    Reads the shared cohort state from the module-level _G dict (inherited
+    via fork). Returns a result row dict, or None if the pattern is not a
+    valid trajectory.
+    """
+    idx, pl, ol = task
+    G = _G
+
+    pattern_items = parse_items_from_pattern_line(pl)
+    if not pattern_items:
+        return None
+    pattern_items = sorted(pattern_items)
+    pnodes_set, numedges = parse_pattern_nodes_and_edges(pattern_items)
+    if not _G["allow_incomplete"] and not is_valid_trajectory(pnodes_set, numedges):
+        return None
+
+    occ_ids = parse_occ_ids(ol)
+    # Observed supports. y_obs is quantised on the SAME L-grid as the null
+    # statistic, aggregating weights per patient and rounding once per patient.
+    pi_obs = [0.0] * G["n_patients"]
+    for t in occ_ids:
+        if 0 <= t < G["K"]:
+            pi_obs[G["owner0"][t]] += G["weights"][t]
+    y_obs = sum(int(round(G["L"] * v)) for v in pi_obs)
+    s_exp = sum(pi_obs)
+    s_theta, _ = compute_theta_support(
+        occ_ids, G["weights"], G["owner0"], G["n_patients"], G["K"], G["theta"]
     )
+
+    # Independent RNG stream per trajectory (stable regardless of ordering).
+    seed_base = G["seed"] + (idx + 1) * 1_000_003
+
+    phis = []
+    used_mc = False
+    for i in range(G["n_patients"]):
+        info = G["patient_info"][i]
+        if info is None:
+            continue
+        rng = np.random.default_rng(seed_base + i)
+        phi_i, mc_i = compute_phi_i(
+            rel_tensor=info["rel_tensor"],
+            weights_i=G["patient_weights"][i],
+            pattern_items=pattern_items,
+            alterations=info["alterations"],
+            null_model=G["null"],
+            mc_cutoff=G["mc_cutoff"],
+            mc_samples=G["mc_samples"],
+            max_exact_placements=G["max_exact_placements"],
+            L=G["L"],
+            rng=rng,
+        )
+        phis.append(phi_i)
+        used_mc = used_mc or mc_i
+
+    # Monte-Carlo p-value correction (add-one numerator). When any patient used
+    # the MC fallback the aggregated null tail is estimated from ~B samples, so
+    # we report the unbiased estimator (B*p + 1)/(B + 1) rather than the raw
+    # tail. Adding 1 to the numerator keeps the p-value valid (never exactly 0)
+    # and slightly conservative, and it reduces to the exact tail as B -> inf;
+    # when p == 0 it collapses to 1/(B + 1), matching the previous floor. Exact
+    # (fully enumerated) trajectories keep their true, possibly tiny, p-value.
+    B = G["mc_samples"]
+
+    def _mc_correct(p):
+        if not used_mc:
+            return p
+        return (B * p + 1.0) / (B + 1.0)
+
+    pval_exp = ""
+    pval_theta = ""
+
+    if G["want_exp"]:
+        F = convolve_phi(phis)
+        pval_exp = f"{_mc_correct(tail_sum(F, y_obs)):.6e}"
+
+    if G["want_theta"]:
+        r_is = []
+        for phi_i in phis:
+            r_is.append(sum(p for e, p in phi_i.items() if e >= G["theta_threshold"]))
+        pval_theta = f"{_mc_correct(compute_pvalue_pb(r_is, int(s_theta))):.6e}"
+
+    return {
+        "pattern": " ".join(pattern_items),
+        "n_nodes": len(pnodes_set),
+        "n_edges": numedges,
+        "s_exp": f"{s_exp:.6f}",
+        "s_theta": int(s_theta),
+        "pval_exp": pval_exp,
+        "pval_theta": pval_theta,
+    }
 
 # =====================================================================
 # Main
@@ -452,10 +560,11 @@ def main():
                     help="Which significance test to run (default: both)")
     ap.add_argument("--theta", type=float, default=1.0,
                     help="Theta threshold for the theta-consensus test")
-    ap.add_argument("--mc_cutoff", type=int, default=5,
+    ap.add_argument("--mc_cutoff", type=int, default=8,
                     help="Use Monte-Carlo when M_i > this value (default: 8)")
-    ap.add_argument("--mc_samples", type=int, default=3000,
-                    help="Number of MC samples per patient in the fallback")
+    ap.add_argument("--mc_samples", type=int, default=10000,
+                    help="Number of MC samples per patient in the fallback "
+                         "(default: 10000)")
     ap.add_argument("--max_exact_placements", type=int, default=2_000_000,
                     help="Fall back to MC if exact enumeration exceeds this")
     ap.add_argument("--seed", type=int, default=0,
@@ -465,6 +574,16 @@ def main():
                          "more accuracy but bloats the exp-test convolution")
     ap.add_argument("--keep_gl", action="store_true",
                     help="Do not drop the germline GL node")
+    ap.add_argument("--n_jobs", type=int, default=1,
+                    help="Parallel workers over trajectories (default: 1). "
+                         "On Linux the pool is forked, so per-patient tensors "
+                         "are shared with no pickling overhead.")
+    ap.add_argument("--allow-incomplete", dest="allow_incomplete",
+                    action="store_true",
+                    help="Do not require the completeness constraint "
+                         "numedges==C(n,2). Use for testing incomplete posets "
+                         "(e.g. POTTR trajectories): only the pairwise relations "
+                         "actually present in the pattern constrain the null.")
     args = ap.parse_args()
 
     drop_gl = not args.keep_gl
@@ -558,78 +677,46 @@ def main():
     want_exp = args.test in ("exp", "both")
     want_theta = args.test in ("theta", "both")
 
-    # Iterate over mined trajectories and test them one by one
-    rows = []
-    n_traj = 0
-    for pl, ol in read_result_pairs(input_path):
-        pattern_items = parse_items_from_pattern_line(pl)
-        if not pattern_items:
-            continue
-        pattern_items = sorted(pattern_items)
-        pnodes_set, numedges = parse_pattern_nodes_and_edges(pattern_items)
-        if not is_valid_trajectory(pnodes_set, numedges):
-            continue
+    # Publish shared read-only cohort state for the trajectory workers.
+    # y_obs is quantised on the SAME L-grid as the null statistic
+    # Y(P) = sum_i round(L * v_i(J_i)); see _process_trajectory for how the
+    # observed statistic is aggregated on that grid.
+    _G.update(
+        n_patients=n_patients, K=K, L=L, owner0=owner0, weights=weights,
+        patient_info=patient_info, patient_weights=patient_weights,
+        null=args.null, mc_cutoff=args.mc_cutoff, mc_samples=args.mc_samples,
+        max_exact_placements=args.max_exact_placements, seed=args.seed,
+        theta=args.theta, theta_threshold=theta_threshold,
+        want_exp=want_exp, want_theta=want_theta,
+        allow_incomplete=args.allow_incomplete,
+    )
 
-        occ_ids = parse_occ_ids(ol)
-        # Compute observed expected and theta supports
-        y_obs = sum(int(round(L * weights[t])) for t in occ_ids if 0 <= t < K)
-        s_exp = y_obs / float(L)
-        s_theta, _ = compute_theta_support(
-            occ_ids, weights, owner0, n_patients, K, args.theta
-        )
+    tasks = [(idx, pl, ol) for idx, (pl, ol) in enumerate(read_result_pairs(input_path))]
+    print(f"[INFO] n_jobs      = {args.n_jobs}   candidate lines = {len(tasks)}")
 
-        n_traj += 1
+    # Parallelise across trajectories. On Linux we fork so the workers inherit
+    # _G (and its relation tensors) by copy-on-write, avoiding any pickling of
+    # the cohort state; only the small (idx, pattern, occ) task is sent.
+    total = len(tasks)
+    step = max(1, total // 20)  # ~5% progress ticks
+    results = []
+    if args.n_jobs and args.n_jobs > 1 and tasks:
+        try:
+            ctx = multiprocessing.get_context("fork")
+        except ValueError:
+            ctx = None  # non-fork platform: falls back to default (spawn re-imports module)
+        with ProcessPoolExecutor(max_workers=args.n_jobs, mp_context=ctx) as ex:
+            for i, r in enumerate(ex.map(_process_trajectory, tasks, chunksize=1), 1):
+                results.append(r)
+                if i % step == 0 or i == total:
+                    print(f"[sig] {i}/{total} trajectories", flush=True)
+    else:
+        for i, t in enumerate(tasks, 1):
+            results.append(_process_trajectory(t))
+            if i % step == 0 or i == total:
+                print(f"[sig] {i}/{total} trajectories", flush=True)
 
-        # Compute one phi_i distribution per patient for this trajectory
-        worker_args = []
-        seed_base = args.seed + n_traj * 1_000_003  # independent stream per trajectory
-        for i in range(n_patients):
-            info = patient_info[i]
-            if info is None:
-                continue
-            worker_args.append((
-                info["rel_tensor"],
-                patient_weights[i],
-                pattern_items,
-                info["alterations"],
-                args.null,
-                args.mc_cutoff,
-                args.mc_samples,
-                args.max_exact_placements,
-                L,
-                seed_base + i,
-            ))
-
-        phis = [_compute_phi_worker(wa) for wa in worker_args]
-
-        pval_exp = ""
-        pval_theta = ""
-
-        if want_exp:
-            # Expected-support p-value from the convolved cohort null
-            F = convolve_phi(phis)
-            pval_exp = f"{tail_sum(F, y_obs):.6e}"
-
-        if want_theta:
-            # Theta p-value from patient-level threshold probabilities
-            r_is = []
-            for phi_i in phis:
-                r_i = sum(p for e, p in phi_i.items() if e >= theta_threshold)
-                r_is.append(r_i)
-            pval_theta = f"{compute_pvalue_pb(r_is, int(s_theta)):.6e}"
-
-        rows.append({
-            "pattern": " ".join(pattern_items),
-            "n_nodes": len(pnodes_set),
-            "n_edges": numedges,
-            "s_exp": f"{s_exp:.6f}",
-            "s_theta": int(s_theta),
-            "pval_exp": pval_exp,
-            "pval_theta": pval_theta,
-        })
-
-        if n_traj % 10 == 0:
-            print(f"  [progress] {n_traj} trajectories tested")
+    rows = [r for r in results if r is not None]
 
     print(f"[INFO] Writing {len(rows)} rows to {output_path}")
     with output_path.open("w", newline="") as f:

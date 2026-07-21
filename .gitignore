@@ -1,4 +1,3 @@
-
 .DS_Store
 MASTRO/test_convres.txt
 MASTRO/test_final.txt
@@ -15,3 +14,7 @@ MASTRO/lcm53/lcm-out*
 MASTRO/lcm53/table-file*
 MASTRO/spurious_analysis
 MASTRO/test
+data/TRACERx/processed_data
+data/TRACERx/data_tracerx
+MASTRO/results
+MASTRO/__pycache__

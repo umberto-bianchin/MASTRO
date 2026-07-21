@@ -2,7 +2,7 @@
 # =============================================================================
 #
 # Quantifies how many frequent itemsets produced by the LCM algorithm are
-# "spurious" — i.e., they do not correspond to valid evolutionary trajectories
+# "spurious", i.e., they do not correspond to valid evolutionary trajectories
 # and would be discarded by the trajectory-validity filter in filter_results.py.
 #
 # A valid trajectory of n mutations requires exactly n*(n-1)/2 pairwise ordering
@@ -13,10 +13,10 @@
 #  2. Run LCM frequent-itemset mining with an optional cap on the number of
 #     solutions (-# flag) and/or a wall-clock timeout.
 #  3. Count itemsets at each stage of the MASTRO filtering pipeline:
-#       a) RAW     — all frequent itemsets output by LCM.
-#       b) VALID   — itemsets passing the trajectory-validity check
+#       a) RAW:     all frequent itemsets output by LCM.
+#       b) VALID:   itemsets passing the trajectory-validity check
 #                    (numedges == n*(n-1)/2).
-#       c) MAXIMAL — valid itemsets that are also maximal.
+#       c) MAXIMAL: valid itemsets that are also maximal.
 #  4. Produce a summary CSV, a detailed JSON, and (optionally) plots.
 #
 # Usage:
@@ -56,8 +56,8 @@ def parse_lcm_output(lcm_out_path: Path):
     """Parse the label-converted LCM output file into structured records.
 
     The LCM output alternates between two line types:
-      - Pattern line:  "edge1 edge2 ... (support)"  — the frequent itemset.
-      - Occurrence line: "tid1 tid2 ..."             — IDs of supporting transactions.
+      - Pattern line:  "edge1 edge2 ... (support)":  the frequent itemset.
+      - Occurrence line: "tid1 tid2 ...":            IDs of supporting transactions.
 
     For each itemset, this function extracts the individual mutation nodes
     and directed edges using `parse_pattern_nodes_and_edges`, then checks
@@ -113,7 +113,7 @@ def parse_lcm_output(lcm_out_path: Path):
                     "is_valid": valid,
                 })
             else:
-                # Orphan occurrence line (no preceding pattern) — skip
+                # Orphan occurrence line (no preceding pattern), skip
                 pass
 
     return records
@@ -293,12 +293,12 @@ def plot_results(results, outdir: Path):
     """Generate summary plots of the spurious-itemset analysis.
 
     Produces two figures saved as PNG files:
-      1. `spurious_analysis.png` — a 2x2 grid showing:
+      1. `spurious_analysis.png`, a 2x2 grid showing:
          (a) Itemset counts at each pipeline stage (log scale) vs. sigma.
          (b) Percentage of spurious itemsets vs. sigma.
          (c) LCM wall-clock time vs. sigma (red bars = timed out).
          (d) Raw LCM output file size vs. sigma.
-      2. `spurious_by_size.png` — side-by-side bar charts comparing the
+      2. `spurious_by_size.png`, side-by-side bar charts comparing the
          size distribution (number of mutation nodes) of valid vs. spurious
          itemsets for a representative subset of sigma values.
     """
@@ -467,7 +467,7 @@ def main():
               for x in args.sigmas.split(",") if x.strip()]
 
     print("=" * 60)
-    print("Spurious Itemset Analysis — MASTRO")
+    print("Spurious Itemset Analysis - MASTRO")
     print("=" * 60)
     print(f"  Dataset:       {npy_path}")
     print(f"  Mode:          {args.mode}")
@@ -516,12 +516,12 @@ def main():
     print(f"  [OK] table-file: {table_file_ids}")
     print(f"  [OK] graphs_ids: {file_graphs_ids}")
 
-    # --- Run analysis for each sigma (highest first — they are fastest) ---
+    # --- Run analysis for each sigma (highest first, they are fastest) ---
     results = []
     for sigma in sorted(sigmas, reverse=True):
-        print(f"\n{'—' * 50}")
+        print(f"\n{'=' * 50}")
         print(f"[STEP] Analysis for sigma = {sigma}")
-        print(f"{'—' * 50}")
+        print(f"{'=' * 50}")
 
         workdir = outdir / f"run_sigma_{sigma}"
 

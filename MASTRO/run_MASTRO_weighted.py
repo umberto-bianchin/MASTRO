@@ -1,18 +1,17 @@
 # =============================================================================
-# MASTRO pipeline  (Algorithms 1, 2 & 3)
+# Weighted MASTRO pipeline (Algorithms 1, 2 and 3) as a standalone command.
 #
-# Stage 1  – Weighted frequent itemset mining (via LCM)
-#   Uses transaction weights w_t = 1/M_i so that weighted support equals
-#   the expected-support metric.  The support threshold -s is therefore a
-#   float (expected # of patients).
-#   This stage alone corresponds to Algorithm 1 (expected-support mining).
-#   Omit -owner (and skip -theta / -st) to stop here.
+# Stage 1: weighted frequent itemset mining (via LCM).
+#   Transaction weights w_t = 1/M_i make the weighted support equal the
+#   expected-support metric, so the support threshold -s is a float (the
+#   expected number of patients). This stage alone is Algorithm 1
+#   (expected-support mining). Omit -owner (and -theta / -st) to stop here.
 #
-# Stage 2  – Post-filter for robustness (requires -w and -owner)
-#   Algorithm 2 (default):  keep patterns P whose theta-support
-#                           s^(θ)(P) ≥ σ_θ  (see postfilter_theta.py)
-#   Algorithm 3 (-alg3)  :  keep only theta-MAXIMAL patterns within each
-#                           s^(θ) bucket  (see postfilter_theta.py --maximal)
+# Stage 2: post-filter for robustness (requires -w and -owner).
+#   Algorithm 2 (default): keep patterns P whose theta-support s_theta(P) is at
+#                          least sigma_theta (see postfilter_theta.py).
+#   Algorithm 3 (-alg3)  : keep only the theta-maximal patterns within each
+#                          s_theta bucket (see postfilter_theta.py --maximal).
 #
 # Example usage:
 #   # Algorithm 1 only (expected support):
@@ -55,7 +54,7 @@ args = parser.parse_args()
 # ---------------------------------------------------------------------------
 temp_files_out = args.g.replace(".txt", "")
 
-# transnum.pl writes the edge→ID mapping here
+# transnum.pl writes the edge -> ID mapping here
 table_file_ids = "./lcm53/table-file-" + args.g
 # Numeric-ID version of the graph file (input to LCM)
 file_graphs_ids = "./lcm53/lcm-out-" + temp_files_out + "_ids.txt"
@@ -63,7 +62,7 @@ file_graphs_ids = "./lcm53/lcm-out-" + temp_files_out + "_ids.txt"
 weights = f" -w {args.w} " if args.w is not None else " "
 # Raw LCM output (pattern + occurrence lines)
 output_lcm = "./lcm53/lcm-out-" + args.g
-# Intermediate results after ID→label conversion and maximal filtering
+# Intermediate results after ID -> label conversion and maximal filtering
 results_converted = temp_files_out + "_convres.txt"
 results_filtered  = temp_files_out + "_filtered.txt"
 results_significance = temp_files_out + "_final.txt"
@@ -72,7 +71,7 @@ results_significance = temp_files_out + "_final.txt"
 results_theta     = temp_files_out + f"_theta{args.theta}_st{args.st}.txt"
 results_theta_max = temp_files_out + f"_theta{args.theta}_st{args.st}_thetamax.txt"
 
-# Step 1: convert edge labels → numeric IDs using transnum.pl
+# Step 1: convert edge labels -> numeric IDs using transnum.pl
 cmd = "./lcm53/transnum.pl " + table_file_ids + " < " + args.g + " > " + file_graphs_ids
 print(cmd)
 os.system(cmd)
@@ -95,7 +94,7 @@ if args.owner is not None:
 
 # Step 2: Run LCM (frequent itemset miner).
 #   "FfI" flags:  F = frequent itemsets, f = output occurrences, I = input in item-list format.
-#   When weights are provided (via -w), LCM uses weighted support ≥ σ.
+#   When weights are provided (via -w), LCM uses weighted support >= sigma.
 cmd = ("./lcm53/lcm FfI" + weights + file_graphs_ids + " "
        + str(args.s) + " " + output_lcm + " > out_lcm_" + args.g + ".txt 2>&1")
 print(cmd)
@@ -107,12 +106,12 @@ print(cmd)
 os.system(cmd)
 
 # Step 4: Keep only one representative per occurrence set (maximal pattern
-# by containment).  Identical occurrence lists → keep the largest itemset.
+# by containment).  Identical occurrence lists -> keep the largest itemset.
 cmd = "python3 filter_results.py -i " + results_converted + " -o " + results_filtered
 print(cmd)
 os.system(cmd)
 
-# Step 5  –  Stage-2 post-filter (robustness via θ-support)
+# Step 5: Stage-2 post-filter (robustness via theta-support)
 # Requires both weights (-w) and owner (-owner) to know per-patient support.
 if args.w is not None and args.owner is not None:
     out_file = results_theta_max if args.alg3 else results_theta
