@@ -5,8 +5,10 @@ tests. A known linear trajectory P = X1 -> X2 -> ... -> Xk over fresh
 alterations is implanted into N randomly chosen "carrier" patients. In each
 carrier we implant P perfectly in a fraction f of that patient's M trees (as a
 real ancestor chain) and randomly in the remaining (1 - f) trees (the same
-alterations placed so that P is not observed). Non-carrier patients never see
-the X alterations.
+alterations placed so that P is not observed). Non-carrier patients also carry
+the X alterations in every tree, but always in a scrambled order, so that
+presence and co-occurrence of the X alterations are identical across the whole
+cohort and only the *conserved order* of P separates carriers from non-carriers.
 
 With uniform weights w = 1/M this gives, by construction:
     * expected support    s^exp(P)   is about N * f
@@ -106,8 +108,17 @@ def build_cohort(rng, n_patients, M, traj, bg_labels, carriers, f):
                 else:
                     trees.append(_noisy_tree(rng, traj, bg_labels))
         else:
+            # Non-carriers now also carry the trajectory alterations, but always
+            # scrambled: presence and co-occurrence match the carriers, so only
+            # the conserved order distinguishes a carrier from a non-carrier. A
+            # non-carrier supports P only by the same accidental 1/k! chance as a
+            # carrier's noisy trees. When traj is empty this degenerates to a
+            # pure background tree.
             for _ in range(M):
-                trees.append(_background_tree(rng, bg_labels))
+                if len(traj):
+                    trees.append(_noisy_tree(rng, traj, bg_labels))
+                else:
+                    trees.append(_background_tree(rng, bg_labels))
         data[i] = trees
     return data
 
@@ -198,14 +209,20 @@ def run_trial(trial_dir, data, traj, sigma, theta, lcmdir,
 # =====================================================================
 # WY threshold on a background-only null cohort (calibrated once)
 # =====================================================================
-def calibrate_threshold(null_dir, rng, n_patients, M, bg_labels, sigma, theta,
+def calibrate_threshold(null_dir, rng, n_patients, M, bg_labels, traj, sigma, theta,
                         lcmdir, null_model, mc_cutoff, mc_samples, wy_M, alpha,
                         par, seed, test, verbose=False):
-    """Build a background-only cohort and derive delta_hat(alpha) via WY."""
+    """Build a global-null cohort and derive delta_hat(alpha) via WY.
+
+    The null cohort has no carriers (f = 0), so every patient carries the
+    trajectory alterations but always scrambled: presence and co-occurrence
+    match the real cohort, and no conserved order is present anywhere. This is
+    the correct null for the design in which non-carriers also carry the X
+    alterations."""
     ensure_dir(null_dir)
     inputs_dir = null_dir / "inputs"
     ensure_dir(inputs_dir)
-    data = build_cohort(rng, n_patients, M, traj=[], bg_labels=bg_labels,
+    data = build_cohort(rng, n_patients, M, traj=traj, bg_labels=bg_labels,
                         carriers=set(), f=0.0)
     graphs_all, weights_uniform, owner_txt, _ = build_inputs(
         list(data), inputs_dir, seed=seed)
@@ -242,7 +259,7 @@ def main():
     ap.add_argument("--M", type=int, default=6, help="trees per patient")
     ap.add_argument("--k", type=int, default=4, help="implanted trajectory length")
     ap.add_argument("--n_background", type=int, default=8)
-    ap.add_argument("--N_list", default="10,20,30", help="carrier counts")
+    ap.add_argument("--N_list", default="2,3,5,10,20,30", help="carrier counts")
     ap.add_argument("--f_list", default="0.2,0.4,0.6,0.8,1.0")
     ap.add_argument("--theta", type=float, default=0.5)
     ap.add_argument("--sigma", type=float, default=2.0)
@@ -289,7 +306,7 @@ def main():
     else:
         cal_rng = np.random.default_rng(args.seed + 999)
         delta_exp, delta_theta = calibrate_threshold(
-            outdir / "_null", cal_rng, args.n_patients, args.M, bg_labels,
+            outdir / "_null", cal_rng, args.n_patients, args.M, bg_labels, traj,
             args.sigma, args.theta, lcmdir, args.null, args.mc_cutoff,
             args.mc_samples, args.wy_M, args.alpha, args.par, args.seed,
             test=args.test, verbose=args.verbose)

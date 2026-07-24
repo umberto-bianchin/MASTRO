@@ -11,7 +11,18 @@
 # with everything else. Runs one sweep per theta value.
 # =============================================================================
 set -euo pipefail
-cd "$(dirname "$0")/../MASTRO"
+# Locate the directory that holds implant_experiment_ensemble.py, robustly to
+# both layouts: scripts/ inside the package (cd ..) or scripts/ as a sibling of
+# MASTRO/ (cd ../MASTRO).
+SDIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SDIR/../implant_experiment_ensemble.py" ]; then
+  cd "$SDIR/.."
+elif [ -f "$SDIR/../MASTRO/implant_experiment_ensemble.py" ]; then
+  cd "$SDIR/../MASTRO"
+else
+  echo "ERROR: cannot locate implant_experiment_ensemble.py from $SDIR" >&2
+  exit 1
+fi
 
 PAR=${PAR:-4}
 THETA_LIST=${THETA_LIST:-"0.5 1.0"}
@@ -19,7 +30,7 @@ NULL=${NULL:-perm}
 N_PATIENTS=${N_PATIENTS:-60}
 MTREES=${MTREES:-6}
 K=${K:-4}
-N_LIST=${N_LIST:-10,20,30}
+N_LIST=${N_LIST:-2,3,5,10,20,30}
 F_LIST=${F_LIST:-0.2,0.4,0.6,0.8,1.0}
 SIGMA=${SIGMA:-2.0}
 ALPHA=${ALPHA:-0.05}
