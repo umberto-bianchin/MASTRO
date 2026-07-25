@@ -13,7 +13,18 @@
 # Independent of the other experiment scripts, safe to run in parallel.
 # =============================================================================
 set -euo pipefail
-cd "$(dirname "$0")/.."
+# Locate the directory that holds run_pipeline.py, robustly to both layouts:
+# scripts/ inside the package (cd ..) or scripts/ as a sibling of MASTRO/
+# (cd ../MASTRO, e.g. the server 'code/' bundle).
+SDIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SDIR/../run_pipeline.py" ]; then
+  cd "$SDIR/.."
+elif [ -f "$SDIR/../MASTRO/run_pipeline.py" ]; then
+  cd "$SDIR/../MASTRO"
+else
+  echo "ERROR: cannot locate run_pipeline.py from $SDIR" >&2
+  exit 1
+fi
 
 M=${M:-2000}
 PAR=${PAR:-4}
@@ -22,7 +33,7 @@ THETA_LIST=${THETA_LIST:-"0.5 1.0"}
 NULL=${NULL:-perm}
 MC_SAMPLES=${MC_SAMPLES:-3000}   # per-patient MC draws; dominant cost knob
 MC_CUTOFF=${MC_CUTOFF:-8}        # M_i above which a patient uses MC
-NPY=../data/breastCancer.npy
+NPY=${NPY:-../data/breastCancer.npy}
 THETA_CSV=$(echo "$THETA_LIST" | tr ' ' ',')
 
 [ -f "$NPY" ] || { echo "ERROR: $NPY not found" >&2; exit 1; }
@@ -36,6 +47,7 @@ for SIGMA in $SIGMA_LIST; do
   python3 run_pipeline.py \
     --npy "$NPY" --sigma "$SIGMA" --seed 0 \
     --theta_list "$THETA_CSV" \
+    --min_mine_sigma 2 \
     --significance --sig_null "$NULL" \
     --sig_mc_cutoff "$MC_CUTOFF" --sig_mc_samples "$MC_SAMPLES" --sig_n_jobs "$PAR" \
     --outdir "$OUT"
@@ -54,6 +66,7 @@ for SIGMA in $SIGMA_LIST; do
       --owner      "$OUT/inputs/owner.txt" \
       --sigma      "$SIGMA" -M "$M" \
       --test both --null "$NULL" --theta "$THETA" --par "$PAR" \
+      --min_mine_sigma 2 \
       --mc_cutoff "$MC_CUTOFF" --mc_samples "$MC_SAMPLES" \
       --outdir "$WYOUT" \
       --pvalues_exp   "$PVAL_EXP" \

@@ -278,6 +278,13 @@ def main():
     ap.add_argument("--sigma", type=int, default=10, help="Support threshold sigma")
     ap.add_argument("--seed", type=int, default=0, help="Random seed for picking one tree per patient")
     ap.add_argument("--theta_list", default="0.25,0.5,0.75,1.0", help="Comma-separated list of theta values")
+    ap.add_argument("--min_mine_sigma", type=int, default=None,
+                    help="Lower bound on the candidate mining threshold for the "
+                         "theta-consensus family. The correctness rule is "
+                         "sigma_exp = floor(theta*sigma); when it falls "
+                         "below this bound the theta family is mined at sigma instead."
+                         "Set e.g. 2 on breastCancer to avoid the sigma=1 blow-up;"
+                        "leave unset on small cohorts such as TRACERx.")
     ap.add_argument("--lcmdir", default="./lcm53", help="Path to lcm53 directory")
     ap.add_argument("--outdir", default=None, help="Output directory (default: results_<timestamp>)")
     ap.add_argument("--keep_gl", action="store_true", help="Keep GL in stats and transactions")
@@ -461,9 +468,41 @@ def main():
         alg23_dir = runs_dir / "alg2_alg3_postfilters"
         ensure_dir(alg23_dir)
 
+        # The theta-consensus family must be mined at the candidate threshold
+        # sigma_exp = floor(theta * sigma_theta) (Section 4.3), NOT at sigma:
+        # otherwise theta-frequent trajectories with expected support in
+        # [theta*sigma, sigma) are silently dropped. For theta = 1 this equals
+        # sigma (Alg 1 is reused). When floor(theta*sigma) drops below
+        # --min_mine_sigma the mining is infeasible (Chapter 6 blow-up), so we
+        # fall back to sigma and warn that the family may be incomplete.
+        alg1_low_cache = {}  # sigma_c -> filtered candidate path (reused across thetas)
         for th in thetas:
+            sigma_c = max(1, int(th * sigma))
+            if sigma_c >= sigma:
+                cand = alg1_filtered
+            elif args.min_mine_sigma is not None and sigma_c < args.min_mine_sigma:
+                cand = alg1_filtered
+                print(f"[WARN] theta={th}: correct candidate threshold "
+                      f"sigma_exp={sigma_c} is below --min_mine_sigma="
+                      f"{args.min_mine_sigma}; mining the theta family at sigma="
+                      f"{sigma} instead. This family may be incomplete "
+                      f"(see Chapter 6).", flush=True)
+            else:
+                if sigma_c not in alg1_low_cache:
+                    low_dir = runs_dir / f"alg1_expected_uniform_sig{sigma_c}"
+                    alg1_low_cache[sigma_c] = run_pipeline(
+                        graphs_txt=graphs_all,
+                        sigma=float(sigma_c),
+                        lcmdir=lcmdir,
+                        workdir=low_dir,
+                        tag=f"expected_uniform_sig{sigma_c}",
+                        weights_txt=weights_uniform,
+                        weighted=True
+                    )
+                cand = alg1_low_cache[sigma_c]
+
             a2, a3 = run_postfilters(
-                expected_filtered=alg1_filtered,
+                expected_filtered=cand,
                 weights_txt=weights_uniform,
                 owner_txt=owner_txt,
                 theta=th,

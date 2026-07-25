@@ -266,7 +266,7 @@ def _run_resample(args):
     """Worker: null sample -> mine -> significance -> extract p-values"""
     (r, graphs_path, weights_path, owner_path,
      sigma, lcmdir, workdir, test, null_model, theta,
-     mc_cutoff, mc_samples, seed, cleanup, verbose) = args
+     mc_cutoff, mc_samples, seed, cleanup, verbose, theta_cand_sigma) = args
 
     # Explicitly set verbosity in the worker: multiprocessing may use 'spawn'
     # (fresh import, VERBOSE resets to the default) rather than 'fork', so we
@@ -300,6 +300,17 @@ def _run_resample(args):
             for line in null_lines:
                 f.write(line + "\n")
 
+        want_exp = test in ("exp", "both")
+        want_theta = test in ("theta", "both")
+        # Mine the null at the lower theta-candidate threshold when requested,
+        # so the null theta family is complete (Section 4.3); exp is recovered
+        # afterwards by filtering the mined patterns to s_exp >= sigma. When
+        # theta_cand_sigma is None (theta=1, exp-only, or infeasible) we mine at
+        # sigma exactly, as before.
+        sigma_mine = sigma
+        if want_theta and theta_cand_sigma is not None and theta_cand_sigma < sigma:
+            sigma_mine = float(theta_cand_sigma)
+
         # Step 2: mine (transnum -> LCM -> convert_results -> filter_results)
         # Standard pipeline identical to run_pipeline.py, applied to the
         # sampled dataset so we mine under the null distribution.
@@ -311,7 +322,7 @@ def _run_resample(args):
         log_path = rdir / "lcm.log"
 
         run_transnum(lcmdir, table_file, null_path, graphs_ids)
-        run_lcm(lcmdir, graphs_ids, sigma, lcm_out, log_path,
+        run_lcm(lcmdir, graphs_ids, sigma_mine, lcm_out, log_path,
                 weights_txt=weights_path)
 
         if not lcm_out.exists() or lcm_out.stat().st_size == 0:
@@ -339,8 +350,6 @@ def _run_resample(args):
         # pattern, the data and theta alone, so selecting after the fact is
         # identical to re-running theta on the post-filtered file, at half the
         # cost.
-        want_exp = test in ("exp", "both")
-        want_theta = test in ("theta", "both")
         sig_seed = seed + r * 1000
 
         sig_csv = rdir / "pvalues.csv"
@@ -364,7 +373,14 @@ def _run_resample(args):
 
         all_exp = []
         if want_exp:
-            all_exp = [float(row["pval_exp"]) for row in rows if row.get("pval_exp")]
+            # exp family is s_exp >= sigma; when sigma_mine < sigma the mined
+            # patterns also include s_exp in [sigma_mine, sigma), which belong
+            # only to the theta family and must be excluded from the exp test.
+            all_exp = [
+                float(row["pval_exp"]) for row in rows
+                if row.get("pval_exp")
+                and float(row.get("s_exp", 0.0)) >= sigma - 1e-9
+            ]
 
         all_theta = []
         if want_theta:
@@ -426,6 +442,14 @@ def main():
                          "testing (default: perm)")
     ap.add_argument("--theta", type=float, default=1.0,
                     help="Theta for theta-consensus test")
+    ap.add_argument("--min_mine_sigma", type=int, default=None,
+                    help="Lower bound on the candidate mining threshold for the "
+                         "NULL theta-consensus family in each resample. The "
+                         "correctness rule is sigma_exp = floor(theta*sigma); when it falls below this bound the null "
+                         "theta family is mined at sigma instead (possibly "
+                         "incomplete, see Chapter 6). Must match the value passed "
+                         "to run_pipeline.py so observed and null families agree. "
+                         "Set e.g. 2 on breastCancer; leave unset on TRACERx.")
     ap.add_argument("--mc_cutoff", type=int, default=8,
                     help="M_i above which to use MC sampling (default: 8)")
     ap.add_argument("--mc_samples", type=int, default=10000,
@@ -490,6 +514,26 @@ def main():
     print(f"[WY] test={args.test} null={args.null} theta={args.theta}")
     print(f"[WY] parallel = {args.par}")
 
+    # Candidate mining threshold for the NULL theta family (Section 4.3):
+    # sigma_exp = floor(theta*sigma). None keeps the old behaviour (mine at
+    # sigma) for theta = 1, for the exp-only test, or when the required
+    # threshold is below --min_mine_sigma (infeasible, Chapter 6).
+    sigma_int = int(round(args.sigma))
+    theta_cand = None
+    if args.test in ("theta", "both") and args.theta < 1.0:
+        sc = max(1, int(args.theta * args.sigma))
+        if sc < sigma_int:
+            if args.min_mine_sigma is not None and sc < args.min_mine_sigma:
+                print(f"[WY][WARN] theta={args.theta}: correct null candidate "
+                      f"threshold sigma_exp={sc} is below --min_mine_sigma="
+                      f"{args.min_mine_sigma}; mining the null theta family at "
+                      f"sigma={sigma_int} instead (may be incomplete, Chapter 6).",
+                      flush=True)
+            else:
+                theta_cand = sc
+                print(f"[WY] null theta family mined at sigma_exp={sc} "
+                      f"(= floor(theta*sigma)) for completeness.", flush=True)
+
     worker_args = []
     for r in range(args.n_resamples):
         worker_args.append((
@@ -497,7 +541,7 @@ def main():
             args.sigma, lcmdir, workdir,
             args.test, args.null, args.theta,
             args.mc_cutoff, args.mc_samples,
-            args.seed, not args.keep, args.verbose,
+            args.seed, not args.keep, args.verbose, theta_cand,
         ))
 
     total = args.n_resamples
