@@ -57,14 +57,15 @@ def main():
     for ax, theta, csv_path in zip(axes, thetas, runs):
         by = load_recall(csv_path)
         Ns = sorted(by.get("theta", {}))
-        shades = {N: str(0.15 + 0.55 * i / max(1, len(Ns) - 1))
+        cmap = plt.cm.viridis
+        colors = {N: cmap(0.08 + 0.84 * i / max(1, len(Ns) - 1))
                   for i, N in enumerate(Ns)}
 
-        # theta-consensus test: one curve per cohort size N
+        # theta-consensus test: one curve per cohort size N, distinct colours
         for N in Ns:
             fs = [f for f, _ in by["theta"][N]]
             rc = [r for _, r in by["theta"][N]]
-            ax.plot(fs, rc, marker="o", ms=4, color=shades[N], lw=1.6,
+            ax.plot(fs, rc, marker="o", ms=4, color=colors[N], lw=1.6,
                     label=f"$s^{{(\\theta)}}$, N={N}", zorder=3)
 
         # expected-support test: reference (identical across N here -> plot once)
