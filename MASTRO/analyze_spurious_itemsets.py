@@ -31,6 +31,7 @@ import argparse
 import csv
 import json
 import re
+import time
 from collections import defaultdict
 from pathlib import Path
 import numpy as np
@@ -52,71 +53,93 @@ from utils import (
 # =====================================================================
 # Parsing and analysis of LCM output
 # =====================================================================
-def parse_lcm_output(lcm_out_path: Path):
-    """Parse the label-converted LCM output file into structured records.
+def compute_stream_stats(lcm_out_path: Path):
+    """Stream the label-converted LCM output and compute spurious statistics.
 
     The LCM output alternates between two line types:
       - Pattern line:  "edge1 edge2 ... (support)":  the frequent itemset.
       - Occurrence line: "tid1 tid2 ...":            IDs of supporting transactions.
 
-    For each itemset, this function extracts the individual mutation nodes
-    and directed edges using `parse_pattern_nodes_and_edges`, then checks
-    whether the edge count matches a complete ordering (valid trajectory).
+    Single pass, counters only: nothing is stored per spurious itemset, so
+    memory stays flat even when LCM emits millions of itemsets. Only the
+    valid trajectories (a small set) are kept, for the maximality filter.
+    The empty itemset (emitted once per run by LCM) is excluded from all
+    counts and reported separately as n_empty.
 
-    Returns a list of dicts with keys:
-      'line', 'items_raw', 'support', 'occ_ids', 'nodes',
-      'numedges', 'n_nodes', 'is_valid'.
+    Returns (stats_dict, valid_records).
     """
-    records = []
-    if not lcm_out_path.exists():
-        return records
+    n_total = 0
+    n_valid = 0
+    n_empty = 0
+    invalid_reasons = defaultdict(int)
+    size_dist_all = defaultdict(int)
+    size_dist_valid = defaultdict(int)
+    size_dist_invalid = defaultdict(int)
+    valid_records = []
 
-    with lcm_out_path.open("r") as f:
-        while True:
-            line = f.readline()
-            if not line:
-                break
-            line = line.strip()
-            if not line:
-                continue
-
-            # Pattern lines contain parenthesized support; occurrence lines do not
-            if "(" in line:
-                m = re.search(r"\((\d+(?:\.\d+)?)\)", line)
-                sup = float(m.group(1)) if m else 0
+    if lcm_out_path.exists():
+        with lcm_out_path.open("r") as f:
+            for line in f:
+                line = line.strip()
+                # Pattern lines contain parenthesized support; occurrence
+                # lines (and blanks) do not and are skipped.
+                if not line or "(" not in line:
+                    continue
 
                 # Strip the "(support)" portion to isolate the space-separated items
                 items_str = re.sub(r"\(.*?\)", "", line).strip()
                 items_raw = [tok for tok in items_str.split() if tok.strip()]
+
+                # LCM emits the empty itemset once per run (it is trivially
+                # frequent). It is not a candidate trajectory: exclude it from
+                # every count, or it pollutes the spurious percentage at high
+                # sigma where it can be the only "spurious" itemset left.
+                if not items_raw:
+                    n_empty += 1
+                    continue
 
                 # Decompose items into unique mutation nodes and pairwise ordering edges
                 nodes, numedges = parse_pattern_nodes_and_edges(items_raw, EDGE_SEPARATORS)
                 n = len(nodes)
                 valid = is_valid_trajectory(nodes, numedges)
 
-                # The next line lists the transaction IDs that support this itemset
-                occ_line = f.readline()
-                occ_ids = frozenset()
-                if occ_line:
-                    occ_ids = frozenset(
-                        int(x) for x in occ_line.strip().split() if x.strip().isdigit()
-                    )
+                n_total += 1
+                size_dist_all[n] += 1
+                if valid:
+                    n_valid += 1
+                    size_dist_valid[n] += 1
+                    m = re.search(r"\((\d+(?:\.\d+)?)\)", line)
+                    sup = float(m.group(1)) if m else 0
+                    valid_records.append({
+                        "support": sup,
+                        "nodes": nodes,
+                        "n_nodes": n,
+                    })
+                else:
+                    size_dist_invalid[n] += 1
+                    # A complete ordering of n nodes requires exactly n*(n-1)/2 edges
+                    expected = n * (n - 1) / 2
+                    if numedges == 0:
+                        invalid_reasons["no_edges"] += 1
+                    elif numedges < expected:
+                        invalid_reasons["missing_edges"] += 1
+                    elif numedges > expected:
+                        invalid_reasons["too_many_edges"] += 1
+                    else:
+                        invalid_reasons["other"] += 1
 
-                records.append({
-                    "line": line,
-                    "items_raw": items_raw,
-                    "support": sup,
-                    "occ_ids": occ_ids,
-                    "nodes": nodes,
-                    "numedges": numedges,
-                    "n_nodes": n,
-                    "is_valid": valid,
-                })
-            else:
-                # Orphan occurrence line (no preceding pattern), skip
-                pass
-
-    return records
+    stats = {
+        "n_raw": n_total,
+        "n_valid": n_valid,
+        "n_invalid": n_total - n_valid,
+        "n_empty": n_empty,
+        "pct_spurious": round(100.0 * (n_total - n_valid) / max(1, n_total), 2),
+        "invalid_reasons": dict(invalid_reasons),
+        "size_dist_all": dict(sorted(size_dist_all.items())),
+        "size_dist_valid": dict(sorted(size_dist_valid.items())),
+        "size_dist_invalid": dict(sorted(size_dist_invalid.items())),
+    }
+    return stats, valid_records
 
 def apply_maximality_filter(valid_records, support_tol=1e-9):
     """Keep only support-preserving maximal trajectories.
@@ -148,66 +171,6 @@ def apply_maximality_filter(valid_records, support_tol=1e-9):
 
     return maximal
 
-def analyze_itemsets(records):
-    """Compute summary statistics for a single LCM run.
-
-    Classifies every itemset as valid or invalid (spurious), applies the
-    maximality filter to the valid subset, and collects:
-      - Counts at each pipeline stage (raw -> valid -> maximal).
-      - Breakdown of invalidity reasons (no edges, missing edges, etc.).
-      - Size distributions (number of mutation nodes) for valid/invalid sets.
-
-    Returns a flat dict suitable for CSV/JSON serialization.
-    """
-    n_total = len(records)
-    valid = [r for r in records if r["is_valid"]]
-    invalid = [r for r in records if not r["is_valid"]]
-    maximal = apply_maximality_filter(valid)
-
-    # Categorize why each invalid itemset fails the trajectory check:
-    # a complete ordering of n nodes requires exactly n*(n-1)/2 edges.
-    invalid_reasons = defaultdict(int)
-    for r in invalid:
-        n = r["n_nodes"]
-        expected = n * (n - 1) / 2
-        actual = r["numedges"]
-        if actual == 0:
-            invalid_reasons["no_edges"] += 1
-        elif actual < expected:
-            invalid_reasons["missing_edges"] += 1
-        elif actual > expected:
-            invalid_reasons["too_many_edges"] += 1
-        else:
-            invalid_reasons["other"] += 1
-
-    # Histogram of itemset sizes (number of distinct mutation nodes)
-    size_dist_all = defaultdict(int)
-    size_dist_valid = defaultdict(int)
-    size_dist_invalid = defaultdict(int)
-
-    for r in records:
-        size_dist_all[r["n_nodes"]] += 1
-    for r in valid:
-        size_dist_valid[r["n_nodes"]] += 1
-    for r in invalid:
-        size_dist_invalid[r["n_nodes"]] += 1
-
-    return {
-        "n_raw": n_total,
-        "n_valid": len(valid),
-        "n_invalid": len(invalid),
-        "n_maximal": len(maximal),
-        "pct_spurious": round(100.0 * len(invalid) / max(1, n_total), 2),
-        "pct_removed_by_maximality": round(
-            100.0 * (len(valid) - len(maximal)) / max(1, len(valid)), 2
-        ),
-        "pct_final_vs_raw": round(100.0 * len(maximal) / max(1, n_total), 2),
-        "invalid_reasons": dict(invalid_reasons),
-        "size_dist_all": dict(sorted(size_dist_all.items())),
-        "size_dist_valid": dict(sorted(size_dist_valid.items())),
-        "size_dist_invalid": dict(sorted(size_dist_invalid.items())),
-    }
-
 
 # =====================================================================
 # End-to-end analysis pipeline for a single support threshold
@@ -224,7 +187,7 @@ def run_analysis_for_sigma(sigma, mode, lcmdir, workdir,
       2. Convert the numeric LCM output back to human-readable mutation
          labels using convert_results.py and the mapping table.
       3. Parse the converted output into structured records and compute
-         spurious-itemset statistics via `analyze_itemsets`.
+         spurious-itemset statistics via `compute_stream_stats`.
 
     Returns a dict merging LCM execution metadata (timing, completion
     status) with the analysis statistics, or None if LCM produced no output.
@@ -250,19 +213,64 @@ def run_analysis_for_sigma(sigma, mode, lcmdir, workdir,
 
     raw_line_count = sum(1 for _ in output_lcm.open("r"))
 
-    # Step 2: Map numeric item IDs back to mutation-edge labels
+    # Step 2: Map numeric item IDs back to mutation-edge labels.
+    # NB: this and the filter_results call below are subprocesses, so their
+    # wall-clock includes ~0.05-0.1s of Python interpreter startup each —
+    # negligible at low sigma, but dominant in the sub-second high-sigma runs.
+    t0 = time.perf_counter()
     run_cmd(["python3", str(SCRIPT_DIR / "convert_results.py"),
          "-m", str(table_file_ids),
          "-i", str(output_lcm),
          "-o", str(results_converted)])
+    t_convert = time.perf_counter() - t0
 
-    # Step 3: Parse converted output and compute spurious-itemset statistics
-    records = parse_lcm_output(results_converted)
-    stats = analyze_itemsets(records)
+    # Step 2b: Time the REAL pipeline filtering stage (filter_results.py),
+    # invoked exactly as run_MASTRO_weighted.py does (completeness check +
+    # occurrence-set maximality in a single pass over the converted file).
+    results_filtered = workdir / f"{tag}_filtered.txt"
+    t0 = time.perf_counter()
+    run_cmd(["python3", str(SCRIPT_DIR / "filter_results.py"),
+         "-i", str(results_converted),
+         "-o", str(results_filtered)])
+    t_filter_real = time.perf_counter() - t0
+
+    # Cross-check: count the patterns kept by the REAL filter. filter_results.py
+    # writes two lines per pattern (itemset + occurrences), so count pattern
+    # lines only. Its dominance criterion (equal occurrence set) is stricter
+    # than apply_maximality_filter's (equal support), so we expect
+    # n_filtered_real >= n_maximal; the converse signals a bug.
+    n_filtered_real = 0
+    if results_filtered.exists():
+        with results_filtered.open("r") as f:
+            n_filtered_real = sum(1 for line in f if "(" in line)
+
+    # Step 3: Stream the converted output once to compute spurious-itemset
+    # statistics, then apply the support-preserving maximality filter to the
+    # (small) valid subset. Analysis-only, not part of the pipeline timing.
+    t0 = time.perf_counter()
+    stats, valid_records = compute_stream_stats(results_converted)
+    maximal = apply_maximality_filter(valid_records)
+    t_stats = time.perf_counter() - t0
+
+    # Final-stage percentages use n_filtered_real (the actual pipeline
+    # output); n_maximal is kept only as a cross-check of the analysis
+    # reimplementation against filter_results.py.
+    stats["n_maximal"] = len(maximal)
+    stats["pct_removed_by_maximality"] = round(
+        100.0 * (stats["n_valid"] - n_filtered_real) / max(1, stats["n_valid"]), 2
+    )
+    stats["pct_final_vs_raw"] = round(
+        100.0 * n_filtered_real / max(1, stats["n_raw"]), 2
+    )
 
     # Record output file sizes for the summary report
     raw_file_size_mb = output_lcm.stat().st_size / (1024 * 1024)
     conv_file_size_mb = results_converted.stat().st_size / (1024 * 1024) if results_converted.exists() else 0
+
+    # Wall-clock time of the real pipeline downstream of LCM: label
+    # conversion (convert_results.py) + completeness/maximality filtering
+    # (filter_results.py), i.e. Steps 3-4 of run_MASTRO_weighted.py.
+    t_postprocess = t_convert + t_filter_real
 
     result = {
         "sigma": sigma,
@@ -271,11 +279,30 @@ def run_analysis_for_sigma(sigma, mode, lcmdir, workdir,
         "raw_file_lines": raw_line_count,
         "raw_file_size_mb": round(raw_file_size_mb, 2),
         "converted_file_size_mb": round(conv_file_size_mb, 2),
+        "t_convert_s": round(t_convert, 3),
+        "t_filter_real_s": round(t_filter_real, 3),
+        "t_postprocess_s": round(t_postprocess, 3),
+        "t_stats_s": round(t_stats, 3),
+        "n_filtered_real": n_filtered_real,
         **stats,
     }
+    # run_lcm_limited sets capped=True whenever the -# flag was PASSED;
+    # what matters is whether the cap was REACHED. Compare against the
+    # total LCM output (candidate itemsets + the empty itemset).
+    if max_itemsets is not None:
+        result["capped"] = (stats["n_raw"] + stats["n_empty"]) >= max_itemsets
+    else:
+        result["capped"] = False
+
+    if n_filtered_real < stats["n_maximal"]:
+        print(f"  [WARN] filter_results kept {n_filtered_real} patterns but the "
+              f"analysis maximality filter kept {stats['n_maximal']}: the two "
+              f"dominance criteria disagree, check both implementations.")
 
     print(f"\n  === sigma={sigma} ===")
     print(f"  LCM: {lcm_info['elapsed_s']}s | completed={lcm_info['completed']} | timed_out={lcm_info['timed_out']}")
+    print(f"  Pipeline post-processing: {t_postprocess:.2f}s "
+          f"(convert_results {t_convert:.2f}s | filter_results {t_filter_real:.2f}s)")
     print(f"  Raw file: {raw_file_size_mb:.2f} MB ({raw_line_count} lines)")
     print(f"  Total itemsets (raw):    {stats['n_raw']}")
     print(f"  Valid trajectories:      {stats['n_valid']}")
@@ -296,7 +323,9 @@ def plot_results(results, outdir: Path):
       1. `spurious_analysis.png`, a 2x2 grid showing:
          (a) Itemset counts at each pipeline stage (log scale) vs. sigma.
          (b) Percentage of spurious itemsets vs. sigma.
-         (c) LCM wall-clock time vs. sigma (red bars = timed out).
+         (c) Wall-clock time vs. sigma, grouped bars on a log axis: LCM
+             enumeration vs. the downstream pipeline stages
+             convert_results.py + filter_results.py.
          (d) Raw LCM output file size vs. sigma.
       2. `spurious_by_size.png`, side-by-side bar charts comparing the
          size distribution (number of mutation nodes) of valid vs. spurious
@@ -317,7 +346,9 @@ def plot_results(results, outdir: Path):
     sigmas = [r["sigma"] for r in results]
     n_raw = [r["n_raw"] for r in results]
     n_valid = [r["n_valid"] for r in results]
-    n_maximal = [r["n_maximal"] for r in results]
+    # Final stage = what filter_results.py (the real pipeline) keeps, not
+    # the analysis reimplementation (n_maximal, cross-check only).
+    n_final = [r["n_filtered_real"] for r in results]
     n_invalid = [r["n_invalid"] for r in results]
     pct_spurious = [r["pct_spurious"] for r in results]
     elapsed = [r["elapsed_s"] for r in results]
@@ -329,7 +360,8 @@ def plot_results(results, outdir: Path):
     ax = axes[0, 0]
     ax.plot(sigmas, n_raw, "o-", label="Raw (LCM)", color="tab:red", linewidth=2)
     ax.plot(sigmas, n_valid, "s-", label="Valid trajectories", color="tab:blue", linewidth=2)
-    ax.plot(sigmas, n_maximal, "^-", label="Maximal", color="tab:green", linewidth=2)
+    ax.plot(sigmas, n_final, "^-", label="Valid and maximal (pipeline output)",
+            color="tab:green", linewidth=2)
     ax.set_xlabel("Support (sigma)")
     ax.set_ylabel("# Itemsets")
     ax.set_title("Itemsets per pipeline stage")
@@ -347,18 +379,38 @@ def plot_results(results, outdir: Path):
     ax.set_title("Percentage of spurious itemsets (non-trajectories)")
     ax.grid(True, alpha=0.3, axis="y")
 
-    # (c) LCM execution time; red bars indicate runs that hit the timeout
+    # (c) Wall-clock breakdown: LCM enumeration vs. the real downstream
+    # pipeline stages (convert_results.py + filter_results.py). Grouped bars
+    # on a log axis: sigma=2 dominates by orders of magnitude and would
+    # flatten every other bar on a linear stacked plot.
     ax = axes[1, 0]
-    colors = ["tab:red" if r["timed_out"] else "tab:blue" for r in results]
-    ax.bar(range(len(sigmas)), elapsed, color=colors, alpha=0.8)
-    ax.set_xticks(range(len(sigmas)))
+    postprocess = [r.get("t_postprocess_s", 0) for r in results]
+    x_pos = np.arange(len(sigmas))
+    width = 0.4
+    lcm_colors = ["tab:red" if r["timed_out"] else "tab:blue" for r in results]
+    ax.bar(x_pos - width / 2, elapsed, width, color=lcm_colors, alpha=0.8)
+    ax.bar(x_pos + width / 2, postprocess, width, color="tab:orange", alpha=0.8)
+    ax.set_xticks(list(x_pos))
     ax.set_xticklabels(sigmas)
     ax.set_xlabel("Support (sigma)")
     ax.set_ylabel("Time (s)")
-    ax.set_title("LCM execution time (red = timed out)")
+    ax.set_yscale("log")
+    any_timed_out = any(r["timed_out"] for r in results)
+    ax.set_title("Wall-clock time: LCM vs. post-hoc filtering"
+                 + (" (red = timed out)" if any_timed_out else ""))
+    # Explicit legend handles: with per-bar colors, ax.bar would take the
+    # first bar's color (red if sigma=2 timed out) for the legend entry.
+    from matplotlib.patches import Patch
+    ax.legend(handles=[
+        Patch(facecolor="tab:blue", alpha=0.8, label="LCM enumeration"),
+        Patch(facecolor="tab:orange", alpha=0.8, label="Post-processing (filtering)"),
+    ])
     ax.grid(True, alpha=0.3, axis="y")
 
-    # (d) Raw LCM output file size (proxy for search-space explosion)
+    # (d) Raw LCM output file size. At low sigma the size is driven by the
+    # itemset count (search-space explosion); at high sigma the per-itemset
+    # weight is dominated by the occurrence lists, so the proxy reading only
+    # holds in the low-sigma region.
     ax = axes[1, 1]
     ax.plot(sigmas, file_sizes, "D-", color="tab:purple", linewidth=2)
     ax.set_xlabel("Support (sigma)")
@@ -547,6 +599,8 @@ def main():
     fieldnames = [
         "sigma", "mode", "completed", "timed_out", "capped",
         "elapsed_s", "max_itemsets",
+        "t_convert_s", "t_filter_real_s", "t_postprocess_s", "t_stats_s",
+        "n_filtered_real", "n_empty",
         "raw_file_lines", "raw_file_size_mb", "converted_file_size_mb",
         "n_raw", "n_valid", "n_invalid", "n_maximal",
         "pct_spurious", "pct_removed_by_maximality", "pct_final_vs_raw",
@@ -577,17 +631,18 @@ def main():
     print("\n" + "=" * 90)
     print("SUMMARY")
     print("=" * 90)
-    header = f"{'sigma':>6} {'Time':>8} {'Raw':>10} {'Valid':>10} {'Spurious':>10} {'%Spur.':>8} {'Maximal':>10} {'%Final':>8} {'MB':>8}"
+    header = (f"{'sigma':>6} {'LCM':>8} {'Post':>8} {'Raw':>10} {'Valid':>10} "
+              f"{'Spurious':>10} {'%Spur.':>8} {'Maximal':>10} {'%Final':>8} {'MB':>8}")
     print(header)
     print("-" * 90)
     for r in results:
         status = "T" if r["timed_out"] else ("C" if r["capped"] else " ")
-        print(f"{r['sigma']:>5}{status} {r['elapsed_s']:>7.1f}s {r['n_raw']:>10,} "
+        print(f"{r['sigma']:>5}{status} {r['elapsed_s']:>7.1f}s {r['t_postprocess_s']:>7.1f}s {r['n_raw']:>10,} "
               f"{r['n_valid']:>10,} {r['n_invalid']:>10,} {r['pct_spurious']:>7.1f}% "
               f"{r['n_maximal']:>10,} {r['pct_final_vs_raw']:>7.1f}% "
               f"{r['raw_file_size_mb']:>7.1f}")
     print("-" * 90)
-    print("  T = timed out | C = capped (-# flag)")
+    print("  T = timed out | C = itemset cap reached")
 
     # --- Generate plots (unless --no_plot was specified) ---
     if not args.no_plot:

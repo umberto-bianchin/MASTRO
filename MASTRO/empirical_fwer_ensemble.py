@@ -113,12 +113,15 @@ def main():
     # Step 1: build the null-dataset pool and record per-dataset minima
     worker_args = []
     for r in range(args.n_datasets):
+        # Last element is theta_cand_sigma (see run_wy_correction_ensemble
+        # ._run_resample): None = mine the null at sigma itself, the setting
+        # under which the thesis calibration was produced.
         worker_args.append((
             r, graphs_path, weights_path, owner_path,
             args.sigma, lcmdir, workdir,
             args.test, args.null, args.theta,
             args.mc_cutoff, args.mc_samples,
-            args.seed, not args.keep, args.verbose,
+            args.seed, not args.keep, args.verbose, None,
         ))
 
     total = args.n_datasets

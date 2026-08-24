@@ -70,11 +70,25 @@ def main():
         ranks, pvals, fdrs = load_fdr_csv(p, col)
         ax.plot(ranks, fdrs, label=label, color=color, marker=".", markersize=3)
 
-        # Report top-k where FDR is below the cutoff
-        eligible = [(r, fdr) for r, fdr in zip(ranks, fdrs) if fdr <= args.fdr_cutoff]
-        if eligible:
-            top_k = max(r for r, _ in eligible)
-            print(f"[{label}] max k with FDR <= {args.fdr_cutoff}: {top_k}")
+        # Report top-k where FDR is below the cutoff. The estimated FDR is not
+        # monotone in k, so "largest k below the level" is ambiguous: we report
+        # the PREFIX value, the largest k before the curve FIRST crosses the
+        # cutoff, so that every prefix of the reported set also satisfies the
+        # bound. This is the convention used in the thesis tables. The global
+        # maximum is printed alongside when the two differ, since a curve that
+        # dips back below the level later would otherwise look like a mismatch.
+        prefix_k = 0
+        for r, fdr in zip(ranks, fdrs):
+            if fdr <= args.fdr_cutoff:
+                prefix_k = r
+            else:
+                break
+        global_k = max((r for r, fdr in zip(ranks, fdrs)
+                        if fdr <= args.fdr_cutoff), default=0)
+        if prefix_k:
+            extra = (f"   (global max, curve is non-monotone: {global_k})"
+                     if global_k != prefix_k else "")
+            print(f"[{label}] max k with FDR <= {args.fdr_cutoff}: {prefix_k}{extra}")
         else:
             print(f"[{label}] no k with FDR <= {args.fdr_cutoff}")
 
