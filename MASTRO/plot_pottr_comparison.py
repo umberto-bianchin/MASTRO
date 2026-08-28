@@ -1,5 +1,5 @@
 """
-Figure for the POTTR vs ensemble-MASTRO comparison.
+Figure for the POTTR vs Multi-MASTRO comparison.
 
 Reads the output of pottr_significance.py and produces a two-panel figure:
 
@@ -9,7 +9,7 @@ Reads the output of pottr_significance.py and produces a two-panel figure:
       which is the signature of counting a single patient's candidate trees as
       independent recurrences.
 
-  (b) POTTR trajectory size vs ensemble expected support s_exp, with points
+  (b) POTTR trajectory size vs multi-tree expected support s_exp, with points
       marked by whether the theta-consensus test finds them significant. The
       large trajectories sit at s_exp <= 1 (one patient's worth of weight) and
       are not theta-significant.
@@ -60,7 +60,7 @@ def main():
     axA.legend(frameon=False, fontsize=8, loc="upper left")
     axA.grid(color="0.93", zorder=0)
 
-    # ---- Panel (b): size vs ensemble expected support ----
+    # ---- Panel (b): size vs multi-tree expected support ----
     for sig, col, lab in [(False, "tab:gray", rf"not $\theta$-sig."),
                           (True, "tab:green", rf"$\theta$-sig. ($p\leq{args.alpha}$)")]:
         xs = [ni for ni, s in zip(n, th_sig) if s == sig]
@@ -69,8 +69,8 @@ def main():
     axB.axhline(1.0, color="0.4", ls="--", lw=0.9,
                 label="one patient ($s^{\\exp}=1$)")
     axB.set_xlabel("POTTR trajectory size (nodes)")
-    axB.set_ylabel(r"ensemble expected support $s^{\exp}$")
-    axB.set_title("(b) ensemble support vs size")
+    axB.set_ylabel(r"multi-tree expected support $s^{\exp}$")
+    axB.set_title("(b) multi-tree support vs size")
     axB.legend(frameon=False, fontsize=8, loc="upper right")
     axB.grid(color="0.93", zorder=0)
 
