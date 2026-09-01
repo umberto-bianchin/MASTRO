@@ -90,6 +90,40 @@ def match_occurrences(pattern_items, tx_sets):
     return [t for t, s in enumerate(tx_sets) if pat <= s]
 
 
+def forward_closure(items):
+    """Canonical key for a trajectory: the transitive closure of its non-root
+    ``a->-b`` relations.
+
+    ``converted_graphs.txt`` stores the transitive *reduction* of the
+    trajectory (``run_POTTR.py`` calls ``nx.transitive_reduction``), while
+    ``significance_output.txt`` stores the *closure* (its ``load_graph`` calls
+    ``nx.transitive_closure_dag``). Comparing the two verbatim only ever
+    matches single-edge trajectories, so both sides are closed here.
+    """
+    succ = {}
+    for it in items:
+        ep = endpoints(it)
+        if ep is None or ep[1] != "->-":
+            continue
+        a, _, b = ep
+        if a == ROOT_LABEL or b == ROOT_LABEL:
+            continue
+        succ.setdefault(a, set()).add(b)
+        succ.setdefault(b, set())
+
+    closed = set()
+    for a in succ:
+        stack, seen = list(succ[a]), set()
+        while stack:
+            b = stack.pop()
+            if b in seen or b == a:
+                continue
+            seen.add(b)
+            closed.add(f"{a}->-{b}")
+            stack.extend(succ.get(b, ()))
+    return frozenset(closed)
+
+
 def load_pottr_pvals(sig_path):
     """Map resolved-``->-`` edge-set -> POTTR permutation p-value, from a POTTR
     significance_output.txt (';'-separated; edges in the first column)."""
@@ -108,8 +142,7 @@ def load_pottr_pvals(sig_path):
             if len(cols) <= max(i_edges, i_pperm):
                 continue
             edges = re.findall(r"[^\[\],\s]+->-[^\[\],\s]+", cols[i_edges])
-            key = frozenset(e for e in edges if ROOT_LABEL not in endpoints(e)[:1] + endpoints(e)[2:])
-            out[key] = cols[i_pperm]
+            out[forward_closure(edges)] = cols[i_pperm]
     return out
 
 
@@ -130,11 +163,16 @@ def main():
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--pottr_sig_name", default="significance_output.txt",
                     help="POTTR significance file inside each kN dir (optional)")
+    ap.add_argument("--pottr_sig_global", default="",
+                    help="extra POTTR significance file covering several k at "
+                         "once (written by pottr_force_significance.py); used "
+                         "for trajectories no per-k file scored")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
     kmin, kmax = (int(x) for x in args.k_range.split(","))
     pottr_dir = Path(args.pottr_dir)
+    global_pvals = load_pottr_pvals(Path(args.pottr_sig_global)) if args.pottr_sig_global else {}
     tx_sets = load_transaction_sets(args.graphs_all)
     _, owner0, _, _ = load_weights_and_owner(args.weights, args.owner)
 
@@ -161,7 +199,7 @@ def main():
             key = " ".join(sorted(rel))
             if key not in meta:
                 occ = match_occurrences(rel, tx_sets)
-                fwd = frozenset(e for e in rel if "->-" in e)
+                fwd = forward_closure(rel)
                 meta[key] = dict(
                     n_nodes_full=len(full_nodes),
                     n_edges_full=len(items),
@@ -170,12 +208,22 @@ def main():
                     occ=occ,
                     n_patients=len({owner0[t] for t in occ if 0 <= t < len(owner0)}),
                     ks=set(),
-                    pottr_pval=pottr_pvals.get(fwd, ""),
+                    fwd=fwd,
+                    pottr_pval="",
                 )
-            meta[key]["ks"].add(k)
+            m = meta[key]
+            if not m["pottr_pval"]:
+                m["pottr_pval"] = pottr_pvals.get(m["fwd"], "")
+            m["ks"].add(k)
 
+    if global_pvals:
+        for m in meta.values():
+            if not m["pottr_pval"]:
+                m["pottr_pval"] = global_pvals.get(m["fwd"], "")
+
+    n_pv = sum(1 for m in meta.values() if m["pottr_pval"])
     print(f"[POTTR] {len(meta)} distinct POTTR trajectories over k in "
-          f"[{kmin},{kmax}]", flush=True)
+          f"[{kmin},{kmax}]; {n_pv} with a POTTR p-value", flush=True)
 
     # --- write a MASTRO-format filtered file and run the ensemble sig test ---
     out_path = Path(args.out)

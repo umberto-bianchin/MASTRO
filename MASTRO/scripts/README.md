@@ -51,3 +51,37 @@ its own workdir (no shared LCM scratch).
 Other tunables (sane defaults): `M` (WY resamples), `SIGMA_LIST`, `THETA_LIST`,
 `NULL` (perm|indep), and for calibration `N_DATASETS`/`M_CAL`/`N_TRIALS`. Quick
 dev pass: `M=1000 N_DATASETS=200 M_CAL=100 N_TRIALS=200`.
+
+## POTTR comparison (breast cancer)
+
+`run_pottr_breastcancer.sh` rebuilds the whole POTTR side of the comparison from
+scratch: matched cohort, POTTR k-sweep, POTTR's own permutation test, and the
+re-scoring under the multi-tree test. Defaults reproduce the reported run
+(whole cohort, `MAX_TREES=2`, `k = 2..50`), so:
+
+    cd MASTRO/MASTRO
+    screen -S pottr
+    POTTR_ENV="" CORES=20 bash scripts/run_pottr_breastcancer.sh 2>&1 | tee logs/pottr_bc.log
+
+Needs Gurobi: leave `POTTR_ENV=""` for a system-wide install, or set it to the
+conda env built from `POTTR/code/environment.yaml`. Expect hours to a day — the
+ILP is O(T^2) in the number of candidate trees (~1750 here).
+
+Stages, in order, each resumable (step B skips any `k<k>/` that already has
+`converted_graphs.txt`, so a killed run restarts where it stopped):
+
+- **(A)** `breastcancer_to_pottr.py` → POTTR dags + the matched multi-tree
+  inputs (`results/pottr_cmp/bc_inputs/`) from the identical trees.
+- **(B)** `run_POTTR.py` once per k → `results/pottr_cmp/pottr_bc/k<k>/`.
+- **(B2)** `pottr_force_significance.py` → `pottr_bc/significance_forced.txt`.
+  `run_POTTR.py` runs its own significance test only when the *largest*
+  trajectory of that k has fewer than 13 nodes, which skips whole k directories,
+  small trajectories included — that is why most trajectories had no
+  `p_POTTR` in the table. This re-applies the gate per trajectory
+  (`POTTR_SIG_MAX_NODES`, default 6; cost grows as n! and C(tree_nodes, n)) and
+  never overwrites POTTR's own files. Set `FORCE_POTTR_SIG=0` to skip it.
+- **(C)** `pottr_significance.py` → `results/pottr_cmp/pottr_bc_significance.csv`,
+  one row per trajectory: trees, patients, `s^exp`, the two multi-tree p-values,
+  and POTTR's own p-value.
+
+Then `plot_pottr_comparison.py` draws the trees-vs-patients figure from that CSV.

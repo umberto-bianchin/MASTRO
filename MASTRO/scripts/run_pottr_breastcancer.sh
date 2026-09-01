@@ -33,11 +33,17 @@ POTTR_OUT=${POTTR_OUT:-results/pottr_cmp/pottr_bc}      # <- k<k>/ subdirs writt
 ENS_DIR=${ENS_DIR:-results/pottr_cmp/bc_inputs}         # matched ensemble inputs
 SIG_OUT=${SIG_OUT:-results/pottr_cmp/pottr_bc_significance.csv}
 
-MAX_TREES=${MAX_TREES:-5}                    # distinct trees/patient cap (drives O(T^2))
-N_PATIENTS=${N_PATIENTS:-80}                 # 0 = all eligible (may be intractable!)
-MULTITREE_ONLY=${MULTITREE_ONLY:-1}          # 1 = only patients with >=2 distinct trees
-K_LIST=${K_LIST:-"2 3 5 8 10"}              # POTTR recurrence levels to sweep
+# Defaults reproduce the run reported in the thesis (Table 7.7):
+# whole cohort, 2 distinct trees per patient, k = 2..50.
+MAX_TREES=${MAX_TREES:-2}                    # distinct trees/patient cap (drives O(T^2))
+N_PATIENTS=${N_PATIENTS:-0}                  # 0 = all eligible (may be intractable!)
+MULTITREE_ONLY=${MULTITREE_ONLY:-0}          # 1 = only patients with >=2 distinct trees
+K_MIN=${K_MIN:-2}                            # POTTR recurrence levels to sweep;
+K_MAX=${K_MAX:-50}                           #   K_LIST defaults to K_MIN..K_MAX
+K_LIST=${K_LIST:-"$(seq "$K_MIN" "$K_MAX" | tr '\n' ' ')"}
 CORES=${CORES:-20}
+FORCE_POTTR_SIG=${FORCE_POTTR_SIG:-1}        # 1 = re-apply run_POTTR's significance
+POTTR_SIG_MAX_NODES=${POTTR_SIG_MAX_NODES:-6} #   gate per trajectory, not per k
 THETA=${THETA:-1.0}
 NULL=${NULL:-perm}
 SEED=${SEED:-0}
@@ -86,15 +92,38 @@ for K in $K_LIST; do
     python3 run_POTTR.py -o "$KOUT" -d "$DAGS_ABS" -k "$K" -c "$CORES" -parallel )
 done
 
-# ---- (C) re-assess POTTR trajectories under the ensemble test ---------------
-echo "=== (C) ensemble significance of POTTR trajectories ==="
 KMIN=$(echo $K_LIST | tr ' ' '\n' | sort -n | head -1)
 KMAX=$(echo $K_LIST | tr ' ' '\n' | sort -n | tail -1)
+
+# ---- (B2) POTTR's own p-value for every trajectory it can score --------------
+# run_POTTR.py runs the MASTRO test only when the *largest* trajectory of that k
+# has < 13 nodes (compute_num_automorph enumerates n! permutations), so whole k
+# directories -- small trajectories included -- come out without a p-value.
+# Re-apply the gate per trajectory instead; POTTR's own files are left alone.
+SIG_GLOBAL=""
+if [ "$FORCE_POTTR_SIG" = "1" ]; then
+  echo "=== (B2) POTTR significance test, per trajectory (<= $POTTR_SIG_MAX_NODES nodes) ==="
+  SIG_GLOBAL="${POTTR_OUT}/significance_forced.txt"
+  python3 pottr_force_significance.py \
+    --pottr_dir "$POTTR_OUT" --k_range "${KMIN},${KMAX}" \
+    --dags "$DAGS_ABS" --pottr_repo "$POTTR_REPO" \
+    --max_nodes "$POTTR_SIG_MAX_NODES" --cores "$CORES" \
+    --out "$SIG_GLOBAL"
+fi
+
+# ---- (C) re-assess POTTR trajectories under the ensemble test ---------------
+echo "=== (C) ensemble significance of POTTR trajectories ==="
 python3 pottr_significance.py \
   --pottr_dir "$POTTR_OUT" --k_range "${KMIN},${KMAX}" \
+  ${SIG_GLOBAL:+--pottr_sig_global "$SIG_GLOBAL"} \
   --graphs_all "${ENS_DIR}/graphs_all.txt" \
   -w "${ENS_DIR}/weights_uniform.txt" --owner "${ENS_DIR}/owner.txt" \
   --theta "$THETA" --null "$NULL" --n_jobs "$CORES" --seed "$SEED" \
   --out "$SIG_OUT"
 
-echo "=== done: POTTR dags=$DAGS_ABS  pottr_out=$POTTR_OUT_ABS  sig=$SIG_OUT ==="
+# ---- (D) figure ------------------------------------------------------------
+PLOT_OUT=${PLOT_OUT:-results/pottr_cmp/pottr_comparison.pdf}
+echo "=== (D) figure ==="
+python3 plot_pottr_comparison.py --csv "$SIG_OUT" --out "$PLOT_OUT"
+
+echo "=== done: POTTR dags=$DAGS_ABS  pottr_out=$POTTR_OUT_ABS  sig=$SIG_OUT  plot=$PLOT_OUT ==="
