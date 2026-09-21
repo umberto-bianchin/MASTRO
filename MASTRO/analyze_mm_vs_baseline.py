@@ -320,13 +320,13 @@ def main():
     print(f"  distinct gene symbols: Multi-MASTRO {len(mm_genes)}, baseline union {len(bl_genes)}, "
           f"baseline-only {sorted(bl_genes - mm_genes)}, multimastro-only {sorted(mm_genes - bl_genes)}")
 
-    # ---- step 2: verification ----
+    # ---- cohort-level summary ----
     mined_counts = [len(baseline[s]["mined"]) for s in args.seed_ids]
     sig_counts = [len(baseline[s]["sig"]) for s in args.seed_ids]
     union_sig = set().union(*(baseline[s]["sig"] for s in args.seed_ids))
     core_sig = set.intersection(*(baseline[s]["sig"] for s in args.seed_ids))
 
-    print("\n=== step 2: published numbers, recomputed ===")
+    print("\n=== cohort summary: family sizes and significant counts ===")
     print(f"  WY threshold_exp (multi-MASTRO, alpha={args.alpha}) = {thr_exp:.6e}"
           f"   [{wy_exp_dir/'wy_thresholds.txt'}]")
     print(f"  WY threshold_theta (theta={args.theta}, alpha={args.alpha}) = {thr_theta:.6e}"
@@ -342,26 +342,26 @@ def main():
     print(f"  multi-MASTRO theta={args.theta} mined  : {len(mm_theta)}")
     print(f"  multi-MASTRO theta={args.theta} signif : {len(mm_theta_sig)}")
 
-    # ---- step 3 ----
+    # ---- Multi-MASTRO significant under the expected-support test ----
     t3 = build_rows(mm_exp_sig, mm_exp, mm_patients, thr_exp, baseline)
     write_csv(out / f"{args.cohort}_sigma{args.sigma}_multimastro_significant_exp.csv", t3)
 
-    # ---- step 4 ----
+    # ---- significant for the baseline but not for Multi-MASTRO ----
     rev_keys = union_sig - mm_exp_sig
     t4 = build_rows(rev_keys, mm_exp, mm_patients, thr_exp, baseline, extra_baseline=True)
     write_csv(out / f"{args.cohort}_sigma{args.sigma}_baseline_only_exp.csv", t4)
 
-    # ---- step 5 ----
+    # ---- Multi-MASTRO significant under the theta-consensus test ----
     t5 = build_rows(mm_theta_sig, mm_theta, mm_patients, thr_theta, baseline)
     write_csv(out / f"{args.cohort}_sigma{args.sigma}_multimastro_significant_theta{args.theta}.csv", t5)
 
     cols = ["trajectory", "s_exp", "n_patients", "pval", "wy_threshold",
             "seeds_hit", "seeds_hit_ids", "mined_in_seeds"]
-    print_table(f"step 3 - Multi-MASTRO significant, expected support (sigma={args.sigma})",
+    print_table(f"Multi-MASTRO significant, expected support (sigma={args.sigma})",
                 t3, args.top, cols)
-    print_table(f"step 4 - significant in >=1 baseline seed, NOT under Multi-MASTRO",
+    print_table(f"significant in >=1 baseline seed, NOT under Multi-MASTRO",
                 t4, args.top, cols + ["mined_by_multimastro", "bl_min_pval", "bl_min_pval_seed"])
-    print_table(f"step 5 - Multi-MASTRO significant, theta-consensus theta={args.theta}",
+    print_table(f"Multi-MASTRO significant, theta-consensus theta={args.theta}",
                 t5, args.top, cols)
     print(f"  note: seeds_hit is still baseline significance under the EXPECTED-SUPPORT test.")
     print(f"  The single-tree baseline carries one tree per patient, so its theta-consensus")

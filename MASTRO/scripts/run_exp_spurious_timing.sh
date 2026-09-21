@@ -1,24 +1,24 @@
 #!/bin/bash
 # =============================================================================
-# EXPERIMENT: Spurious-itemset overhead + per-stage wall-clock timing (Ch. 6).
+# EXPERIMENT: spurious-itemset overhead + per-stage wall-clock timing.
 #
-# Re-runs analyze_spurious_itemsets.py on breastCancer (weighted mode, same
-# configuration as the thesis Section 6.2 figures) with the new per-stage
-# timers: LCM enumeration vs. the real downstream pipeline stages
-# (convert_results.py + filter_results.py, i.e. Steps 3-4 of
-# run_MASTRO_weighted.py).
+# Runs analyze_spurious_itemsets.py on breastCancer in weighted mode with
+# per-stage timers, separating LCM enumeration from the downstream pipeline
+# stages (convert_results.py + filter_results.py). Most itemsets LCM emits are
+# not valid trajectories - they are discarded downstream for not being
+# relation-complete - and this measures what that costs.
 #
 # Outputs (in results/spurious_analysis):
 #   spurious_summary.csv   -> per-sigma counts + t_convert_s, t_filter_real_s,
-#                             t_postprocess_s (columns used for the thesis text)
+#                             t_postprocess_s
 #   spurious_details.json  -> full breakdown
-#   spurious_analysis.png  -> updated 2x2 figure; panel (c) now stacks LCM
-#                             time vs. post-processing time
+#   spurious_analysis.png  -> 2x2 figure; panel (c) compares LCM time against
+#                             post-processing time
 #   spurious_by_size.png   -> valid/spurious breakdown by |V(A)|
 #
 # Independent of the other experiment scripts, safe to run in parallel.
-# NOTE: the thesis currently states these numbers were measured on a MacBook
-# M2 Pro; if this run replaces them, update the hardware sentence in Sec. 6.2.
+# NOTE: these timings are hardware-dependent; record the machine alongside
+# any number taken from this script.
 # =============================================================================
 set -euo pipefail
 # Locate the directory that holds analyze_spurious_itemsets.py, robustly to
@@ -34,8 +34,8 @@ else
   exit 1
 fi
 
-# Same configuration as the thesis run (Sec. 6.2): all sigmas of the figure,
-# 5e6 itemset cap, 180 s timeout per LCM invocation, weighted mode, seed 0.
+# All sigmas of the figure, 5e6 itemset cap, 180 s timeout per LCM
+# invocation, weighted mode, seed 0.
 SIGMAS=${SIGMAS:-2,3,4,5,6,8,10,15,20}
 MAXITEMS=${MAXITEMS:-5000000}
 TIMEOUT=${TIMEOUT:-180}

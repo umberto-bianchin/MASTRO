@@ -36,6 +36,7 @@ from collections import defaultdict
 from pathlib import Path
 import numpy as np
 from utils import (
+    PYTHON,
     SCRIPT_DIR,
     EDGE_SEPARATORS,
     ensure_dir,
@@ -215,10 +216,10 @@ def run_analysis_for_sigma(sigma, mode, lcmdir, workdir,
 
     # Step 2: Map numeric item IDs back to mutation-edge labels.
     # NB: this and the filter_results call below are subprocesses, so their
-    # wall-clock includes ~0.05-0.1s of Python interpreter startup each —
+    # wall-clock includes ~0.05-0.1s of Python interpreter startup each,
     # negligible at low sigma, but dominant in the sub-second high-sigma runs.
     t0 = time.perf_counter()
-    run_cmd(["python3", str(SCRIPT_DIR / "convert_results.py"),
+    run_cmd([PYTHON, str(SCRIPT_DIR / "convert_results.py"),
          "-m", str(table_file_ids),
          "-i", str(output_lcm),
          "-o", str(results_converted)])
@@ -229,7 +230,7 @@ def run_analysis_for_sigma(sigma, mode, lcmdir, workdir,
     # occurrence-set maximality in a single pass over the converted file).
     results_filtered = workdir / f"{tag}_filtered.txt"
     t0 = time.perf_counter()
-    run_cmd(["python3", str(SCRIPT_DIR / "filter_results.py"),
+    run_cmd([PYTHON, str(SCRIPT_DIR / "filter_results.py"),
          "-i", str(results_converted),
          "-o", str(results_filtered)])
     t_filter_real = time.perf_counter() - t0
@@ -487,8 +488,8 @@ def main():
     ap.add_argument("--seed", type=int, default=0,
                     help="Random seed for tree sampling (unweighted mode)")
     ap.add_argument("--mode", choices=["weighted", "unweighted"], default="weighted",
-                    help="'weighted' (Alg 1, all trees with weights) or "
-                         "'unweighted' (Alg 0, one sampled tree per patient)")
+                    help="'weighted' (all trees, with weights) or "
+                         "'unweighted' (one sampled tree per patient)")
     ap.add_argument("--max_itemsets", type=int, default=None,
                     help="Cap on the number of itemsets LCM may output (-# flag). "
                          "None means no cap.")

@@ -2,7 +2,7 @@
 """Aggregate the single-tree baseline seed sweep across random seeds.
 
 For each sigma, across all seeds under <root>/sigma<S>/seed<K>, report:
-  - mean +/- sd of the number of FREQUENT trajectories mined by Alg 0;
+  - mean +/- sd of the number of FREQUENT trajectories mined by the baseline;
   - mean +/- sd of the number SIGNIFICANT at FWER <= alpha;
   - the appear/disappear picture: how many trajectories are significant in
     EVERY seed (a stable "core") versus in only SOME (seed-dependent), with a
@@ -33,7 +33,7 @@ def read_threshold(wy_dir, alpha):
 
 
 def read_family(sig_csv):
-    """Return list of (pattern, pval_exp) for the Alg 0 family."""
+    """Return list of (pattern, pval_exp) for the single-tree baseline family."""
     rows = []
     with open(sig_csv) as f:
         for r in csv.DictReader(f):
@@ -99,7 +99,7 @@ def main():
         fm, fs = ms(n_frequent)
         sm, ss = ms(n_significant)
         emit(f"  seeds used         : {len(all_seeds)}  {all_seeds}")
-        emit(f"  frequent (Alg 0)   : mean {fm:.1f} +/- {fs:.1f}   "
+        emit(f"  frequent (baseline): mean {fm:.1f} +/- {fs:.1f}   "
              f"min {min(n_frequent)}  max {max(n_frequent)}")
         emit(f"  significant @FWER  : mean {sm:.2f} +/- {ss:.2f}   "
              f"min {min(n_significant)}  max {max(n_significant)}")

@@ -2,15 +2,15 @@
 # =============================================================================
 # EXPERIMENT: single-tree baseline seed sweep across random seeds.
 #
-# The single-tree baseline (Alg 0) picks ONE tree per patient at random, so its
+# The single-tree baseline picks ONE tree per patient at random, so its
 # results depend on the random seed. To report the mean and variance of how
 # many trajectories it mines (FREQUENT) and how many survive correction
 # (SIGNIFICANT), and which trajectories flip in or out across samplings,
 # we repeat the whole single-tree pipeline over many seeds.
 #
 # For each (sigma, seed):
-#   1. run_pipeline.py  -> sample one tree/patient with this seed, mine Alg 0,
-#                          and score it with the (original) MASTRO test.
+#   1. run_pipeline.py  -> sample one tree/patient with this seed, mine the
+#                          baseline family, and score it with the single-tree test.
 #   2. run_wy_correction_ensemble.py on the SAMPLED single-tree family
 #                          (graphs_sampled / weights_sampled=1.0 / owner_sampled)
 #                          -> WY threshold at alpha, i.e. the significant count.
@@ -18,7 +18,7 @@
 # set-diff across seeds.
 #
 # COST: run_pipeline is invoked with --single_tree_only, so the seed-independent
-# ensemble families (Alg 1/2/3) are NOT re-mined or re-scored each seed, only
+# ensemble families are NOT re-mined or re-scored each seed, only
 # the cheap single-tree baseline (M_i = 1, exact null) is.
 #
 # PARALLELISM: seeds and sigmas are independent. Either raise PAR (per-run cores)

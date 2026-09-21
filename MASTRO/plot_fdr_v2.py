@@ -74,7 +74,7 @@ def main():
         # monotone in k, so "largest k below the level" is ambiguous: we report
         # the PREFIX value, the largest k before the curve FIRST crosses the
         # cutoff, so that every prefix of the reported set also satisfies the
-        # bound. This is the convention used in the thesis tables. The global
+        # bound. This is the convention used in the reported tables. The global
         # maximum is printed alongside when the two differ, since a curve that
         # dips back below the level later would otherwise look like a mismatch.
         prefix_k = 0

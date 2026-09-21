@@ -4,21 +4,24 @@ Given a dataset (either a .npy object array indexed data[patient][tree][edge] =
 [parent, child], or a pre-built graphs .txt plus an owner file), this script
 builds the transaction inputs and mines four families of trajectories:
 
-  Algorithm 0 : single-tree baseline. One tree per patient is sampled at random
-                and mined with unweighted frequent-itemset mining.
-  Algorithm 1 : expected support. All candidate trees are pooled, each weighted
-                by 1/M_i (M_i is the number of trees of patient i), and mined
-                with weighted frequent-itemset mining.
-  Algorithm 2 : theta-frequent post-filter applied on top of Algorithm 1.
-  Algorithm 3 : theta-maximal post-filter applied on top of Algorithm 1.
+  single-tree baseline   one tree per patient is sampled at random and mined
+                         with unweighted frequent-itemset mining. Output files
+                         are prefixed alg0_.
+  expected support       all candidate trees are pooled, each weighted by 1/M_i
+                         (M_i is the number of trees of patient i), and mined
+                         with weighted frequent-itemset mining. Prefixed alg1_.
+  theta-frequent         post-filter on the expected-support family. Prefixed alg2_.
+  theta-maximal          the theta-frequent family reduced to its maximal
+                         elements. Prefixed alg3_.
 
 The four mined families are then compared (Jaccard similarity, per-method unique
 patterns). With --significance every family is scored under the ensemble null
-(compute_significance_ensemble.py): the expected-support test on Alg 0 and Alg 1,
-the theta-consensus test on Alg 2 and Alg 3. With --single_tree_only only
-Algorithm 0 is built, mined and scored; the seed-independent ensemble families
-(Alg 1/2/3) are skipped, which is what the single-tree seed sweep needs since
-those families would be recomputed identically for every seed.
+(compute_significance_ensemble.py): the expected-support test on the baseline and
+the expected-support families, the theta-consensus test on the two theta families.
+With --single_tree_only only the baseline is built, mined and scored; the
+seed-independent ensemble families are skipped, which is what the single-tree
+seed sweep needs since those families would be recomputed identically for every
+seed.
 
 Every stage skips itself when its output file already exists, so an interrupted
 run can be resumed by re-invoking it with the same --outdir.
@@ -36,6 +39,7 @@ from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 import numpy as np
 from utils import (
+    PYTHON,
     SCRIPT_DIR,
     ensure_dir,
     run_cmd,
@@ -51,7 +55,7 @@ from utils import (
 # Run pipelines
 # -------------------------
 def run_pipeline(graphs_txt: Path, sigma: float, lcmdir: Path, workdir: Path, tag: str, weights_txt: Optional[Path] = None, weighted: bool = False):
-    """Algorithm 0-1 pipeline: FIM on one-tree-per-patient/all trees data
+    """Mine one family: frequent itemsets over one tree per patient, or all trees
 
     Steps:  transnum -> LCM (no -w) -> convert_results -> filter_results
     """
@@ -79,27 +83,27 @@ def run_pipeline(graphs_txt: Path, sigma: float, lcmdir: Path, workdir: Path, ta
         else:
             run_lcm(lcmdir, file_graphs_ids, sigma, output_lcm, log_path, weights_txt=None)
 
-        run_cmd(["python3", str(SCRIPT_DIR / "convert_results.py"),
+        run_cmd([PYTHON, str(SCRIPT_DIR / "convert_results.py"),
                  "-m", str(table_file_ids), "-i", str(output_lcm), "-o", str(results_converted)])
 
     if results_filtered.exists():
         print(f"[SKIP] {results_filtered.name} already exists - skipping filter_results")
     else:
-        run_cmd(["python3", str(SCRIPT_DIR / "filter_results.py"),
+        run_cmd([PYTHON, str(SCRIPT_DIR / "filter_results.py"),
                  "-i", str(results_converted), "-o", str(results_filtered)])
 
     return results_filtered
 
 def run_postfilters(expected_filtered: Path, weights_txt: Path, owner_txt: Path, theta: float, st: int, workdir: Path, tag: str):
-    """Stage-2 post-filters (Algorithms 2 and 3) on already-filtered Alg-1 output
+    """Apply both theta post-filters to an already-filtered expected-support family
 
-    Runs both Algorithm 2 (theta-frequent) and Algorithm 3 (theta-maximal),
-    returning the paths to both output files
+    Runs the theta-frequent filter and the theta-maximal one, returning the
+    paths to both output files
     """
     out_alg2 = workdir / f"{tag}_alg2_theta{theta}_st{st}.txt"
     out_alg3 = workdir / f"{tag}_alg3_theta{theta}_st{st}.txt"
 
-    run_cmd(["python3", str(SCRIPT_DIR / "postfilter_theta.py"),
+    run_cmd([PYTHON, str(SCRIPT_DIR / "postfilter_theta.py"),
              "-i", str(expected_filtered),
              "-o", str(out_alg2),
              "-w", str(weights_txt),
@@ -107,7 +111,7 @@ def run_postfilters(expected_filtered: Path, weights_txt: Path, owner_txt: Path,
              "-theta", str(theta),
              "-st", str(st)])
 
-    run_cmd(["python3", str(SCRIPT_DIR / "postfilter_theta.py"),
+    run_cmd([PYTHON, str(SCRIPT_DIR / "postfilter_theta.py"),
              "-i", str(expected_filtered),
              "-o", str(out_alg3),
              "-w", str(weights_txt),
@@ -127,7 +131,7 @@ def _run_sig(input_path, output_path, npy_path, graphs_all_path,
              test, null_model, mc_cutoff, mc_samples, seed, theta=None, n_jobs=1):
     """Invoke compute_significance_ensemble.py for one (filtered file, test) pair"""
     cmd = [
-        "python3", str(SCRIPT_DIR / "compute_significance_ensemble.py"),
+        PYTHON, str(SCRIPT_DIR / "compute_significance_ensemble.py"),
         "-i", str(input_path),
         "-o", str(output_path),
         "-w", str(weights_txt),
@@ -157,14 +161,15 @@ def run_significance_tests(sig_dir, npy_path, npy_sampled_path,
                            single_tree_only=False):
     """Run significance tests on every pipeline output
 
-    Alg 0 uses the sampled weights/owner (1.0 per patient, 1 transaction per patient)
-    Alg 1/2/3 use the uniform weights/owner (1/M_i per tree, M_i transactions per patient)
+    The baseline uses the sampled weights/owner (1.0 per patient, one transaction
+    per patient); the three ensemble families use the uniform weights/owner
+    (1/M_i per tree, M_i transactions per patient)
 
     Either npy_path or graphs_all_path must be set (not both)
     """
     jobs = []
 
-    # Alg 0 -> expected-support test, with ITS OWN weights/owner
+    # single-tree baseline -> expected-support test, with ITS OWN weights/owner
     out = sig_dir / "alg0_mastro_random_pvalues_exp.csv"
     jobs.append(dict(
         input_path=alg0_filtered, output_path=out,
@@ -183,7 +188,7 @@ def run_significance_tests(sig_dir, npy_path, npy_sampled_path,
             _run_sig(n_jobs=n_jobs, **j)
         return
 
-    # Alg 1 -> expected-support test, with uniform weights/owner
+    # expected-support family -> expected-support test, with uniform weights/owner
     out = sig_dir / "alg1_expected_uniform_pvalues_exp.csv"
     jobs.append(dict(
         input_path=alg1_filtered, output_path=out,
@@ -194,7 +199,7 @@ def run_significance_tests(sig_dir, npy_path, npy_sampled_path,
         mc_cutoff=mc_cutoff, mc_samples=mc_samples, seed=seed,
     ))
 
-    # Alg 2 / Alg 3 -> theta-consensus test, once per theta
+    # the two theta families -> theta-consensus test, once per theta
     for th in thetas:
         for prefix, paths in [("alg2", alg2_paths), ("alg3", alg3_paths)]:
             key = f"{prefix}_theta{th}"
@@ -290,10 +295,12 @@ def main():
     ap.add_argument("--keep_gl", action="store_true", help="Keep GL in stats and transactions")
     ap.add_argument("--significance", action="store_true",
                     help="Run ensemble significance tests after mining "
-                         "(exp test on alg0/alg1, theta test on alg2/alg3)")
+                         "(expected-support test on the baseline and the "
+                         "expected-support family, theta-consensus test on the "
+                         "two theta families)")
     ap.add_argument("--single_tree_only", action="store_true",
-                    help="Only build/mine/score the single-tree baseline (Alg 0). "
-                         "Skips the seed-independent ensemble families (Alg 1/2/3) "
+                    help="Only build/mine/score the single-tree baseline. "
+                         "Skips the seed-independent ensemble families "
                          "and their significance -- for the single-tree seed sweep, "
                          "where redoing the ensemble every seed is pure waste.")
     ap.add_argument("--sig_null", choices=["indep", "perm"], default="perm",
@@ -336,7 +343,7 @@ def main():
             patients_trees, inputs_dir, seed=args.seed, drop_gl=drop_gl
         )
 
-        # Alg 0 (single-tree baseline) is scored as an ensemble of size one per
+        # The single-tree baseline is scored as an ensemble of size one per
         # patient: exactly one transaction per patient, with weight 1.0. We build
         # a dedicated one-tree-per-patient .npy and matching weights/owner files so
         # the significance test sees the sampled family, not the pooled ensemble.
@@ -437,7 +444,7 @@ def main():
     sigma = args.sigma
     thetas = [float(x.strip()) for x in args.theta_list.split(",") if x.strip()]
 
-    # --- Algorithm 0: random sampling, unweighted FIM ---
+    # --- single-tree baseline: random sampling, unweighted FIM ---
     alg0_dir = runs_dir / "alg0_mastro_random"
     alg0_filtered = run_pipeline(
         graphs_txt=graphs_sampled,
@@ -452,7 +459,7 @@ def main():
     alg3_paths = {}
 
     if not args.single_tree_only:
-        # --- Algorithm 1: all trees, weighted FIM (expected support) ---
+        # --- expected support: all trees, weighted FIM ---
         alg1_dir = runs_dir / "alg1_expected_uniform"
         alg1_filtered = run_pipeline(
             graphs_txt=graphs_all,
@@ -469,12 +476,14 @@ def main():
         ensure_dir(alg23_dir)
 
         # The theta-consensus family must be mined at the candidate threshold
-        # sigma_exp = floor(theta * sigma_theta) (Section 4.3), NOT at sigma:
-        # otherwise theta-frequent trajectories with expected support in
-        # [theta*sigma, sigma) are silently dropped. For theta = 1 this equals
-        # sigma (Alg 1 is reused). When floor(theta*sigma) drops below
-        # --min_mine_sigma the mining is infeasible (Chapter 6 blow-up), so we
-        # fall back to sigma and warn that the family may be incomplete.
+        # sigma_exp = floor(theta * sigma_theta), NOT at sigma: otherwise
+        # theta-frequent trajectories whose expected support falls in
+        # [theta*sigma, sigma) are silently dropped. For theta = 1 the two
+        # thresholds coincide and the expected-support family is reused.
+        # Lowering the mining threshold enlarges the candidate set very fast, so
+        # when floor(theta*sigma) drops below --min_mine_sigma the mining is not
+        # tractable: fall back to sigma and warn that the family may be
+        # incomplete.
         alg1_low_cache = {}  # sigma_c -> filtered candidate path (reused across thetas)
         for th in thetas:
             sigma_c = max(1, int(th * sigma))
@@ -485,8 +494,8 @@ def main():
                 print(f"[WARN] theta={th}: correct candidate threshold "
                       f"sigma_exp={sigma_c} is below --min_mine_sigma="
                       f"{args.min_mine_sigma}; mining the theta family at sigma="
-                      f"{sigma} instead. This family may be incomplete "
-                      f"(see Chapter 6).", flush=True)
+                      f"{sigma} instead. This family may be incomplete.",
+                      flush=True)
             else:
                 if sigma_c not in alg1_low_cache:
                     low_dir = runs_dir / f"alg1_expected_uniform_sig{sigma_c}"

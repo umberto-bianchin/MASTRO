@@ -117,7 +117,7 @@ def main():
                       f"thr theta={r['threshold_theta']:.6g})")
 
     if args.latex:
-        print("\n% Table 7.6 body")
+        print("\n% overlap table body")
         for r in rows:
             name = "Breast" if r["cohort"].lower().startswith("breast") else "TRACERx"
             print(f"{name} & ${r['sigma']}$ & ${r['theta']}$ & ${r['exp']}$ & "

@@ -36,6 +36,7 @@ from pathlib import Path
 import numpy as np
 
 from utils import (
+    PYTHON,
     SCRIPT_DIR, ensure_dir, build_inputs, load_weights_and_owner,
     read_result_pairs, parse_items_from_pattern_line, run_cmd, set_verbose,
 )
@@ -160,7 +161,7 @@ def run_trial(trial_dir, data, traj, sigma, theta, lcmdir,
     graphs_all, weights_uniform, owner_txt, _ = build_inputs(
         list(data), inputs_dir, seed=seed)
 
-    # Alg 1: expected-support maximal family
+    # expected-support maximal family
     alg1 = run_pipeline(graphs_txt=graphs_all, sigma=float(sigma), lcmdir=lcmdir,
                         workdir=trial_dir / "alg1", tag="alg1",
                         weights_txt=weights_uniform, weighted=True)
@@ -171,7 +172,7 @@ def run_trial(trial_dir, data, traj, sigma, theta, lcmdir,
     if want_exp:
         sig_exp = trial_dir / "pvalues_exp.csv"
         run_cmd([
-            "python3", str(SCRIPT_DIR / "compute_significance_ensemble.py"),
+            PYTHON, str(SCRIPT_DIR / "compute_significance_ensemble.py"),
             "-i", str(alg1), "-o", str(sig_exp),
             "-w", str(weights_uniform), "--owner", str(owner_txt),
             "--graphs_all", str(graphs_all),
@@ -182,10 +183,10 @@ def run_trial(trial_dir, data, traj, sigma, theta, lcmdir,
         rec_exp = _recovered(sig_exp, p_items, "pval_exp", delta_exp)
 
     if want_theta:
-        # Alg 3: theta-maximal family
+        # theta-maximal family
         alg3 = trial_dir / "alg3.txt"
         run_cmd([
-            "python3", str(SCRIPT_DIR / "postfilter_theta.py"),
+            PYTHON, str(SCRIPT_DIR / "postfilter_theta.py"),
             "-i", str(alg1), "-o", str(alg3),
             "-w", str(weights_uniform), "-owner", str(owner_txt),
             "-theta", str(theta), "-st", str(int(round(sigma))), "--maximal",
@@ -193,7 +194,7 @@ def run_trial(trial_dir, data, traj, sigma, theta, lcmdir,
         if alg3.exists() and alg3.stat().st_size > 0:
             sig_theta = trial_dir / "pvalues_theta.csv"
             run_cmd([
-                "python3", str(SCRIPT_DIR / "compute_significance_ensemble.py"),
+                PYTHON, str(SCRIPT_DIR / "compute_significance_ensemble.py"),
                 "-i", str(alg3), "-o", str(sig_theta),
                 "-w", str(weights_uniform), "--owner", str(owner_txt),
                 "--graphs_all", str(graphs_all),

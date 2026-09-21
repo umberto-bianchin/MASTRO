@@ -33,8 +33,8 @@ POTTR_OUT=${POTTR_OUT:-results/pottr_cmp/pottr_bc}      # <- k<k>/ subdirs writt
 ENS_DIR=${ENS_DIR:-results/pottr_cmp/bc_inputs}         # matched ensemble inputs
 SIG_OUT=${SIG_OUT:-results/pottr_cmp/pottr_bc_significance.csv}
 
-# Defaults reproduce the run reported in the thesis (Table 7.7):
-# whole cohort, 2 distinct trees per patient, k = 2..50.
+# Defaults: whole cohort, 2 distinct trees per patient, k = 2..50. The cap is
+# what makes the run tractable at all; see the header above.
 MAX_TREES=${MAX_TREES:-2}                    # distinct trees/patient cap (drives O(T^2))
 N_PATIENTS=${N_PATIENTS:-0}                  # 0 = all eligible (may be intractable!)
 MULTITREE_ONLY=${MULTITREE_ONLY:-0}          # 1 = only patients with >=2 distinct trees

@@ -13,6 +13,7 @@
 
 import re
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -50,6 +51,13 @@ def set_verbose(flag: bool):
 # =====================================================================
 # General helpers
 # =====================================================================
+# The interpreter running this pipeline. Stages are spawned as subprocesses,
+# and "python3" from PATH is not necessarily the same interpreter (a venv
+# entered as "python", a conda env, a system python without the deps): using
+# sys.executable keeps every stage in the environment the user launched.
+PYTHON = sys.executable
+
+
 def ensure_dir(p: Path):
     """Create directory and parents if they don't exist."""
     p.mkdir(parents=True, exist_ok=True)
@@ -199,7 +207,8 @@ def build_inputs(patients_trees, outdir: Path, seed: int, drop_gl=True):
       - graphs_all.txt      : one transaction per tree (ALL trees for all patients)
       - weights_uniform.txt : w_t = 1/M_i for each transaction (for weighted FIM)
       - owner.txt           : patient index for each transaction (0-based)
-      - graphs_sampled.txt  : one randomly-sampled tree per patient (for Alg 0)
+      - graphs_sampled.txt  : one randomly-sampled tree per patient, for the
+                              single-tree baseline
 
     Returns (graphs_all, weights_uniform, owner, graphs_sampled) as Paths.
     """
@@ -226,7 +235,7 @@ def build_inputs(patients_trees, outdir: Path, seed: int, drop_gl=True):
                 fw.write(f"{w}\n")
                 fo.write(f"{i}\n")
 
-    # One random tree per patient: for Algorithm 0
+    # One random tree per patient: the single-tree baseline
     with graphs_sampled.open("w") as fs:
         for i, tlist in enumerate(patients_trees):
             if not tlist:

@@ -18,3 +18,5 @@ data/TRACERx/processed_data
 data/TRACERx/data_tracerx
 MASTRO/results
 MASTRO/__pycache__
+MASTRO/lcm53/__tmp*
+MASTRO/lcm53/lcm

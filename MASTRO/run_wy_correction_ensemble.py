@@ -36,6 +36,7 @@ from pathlib import Path
 import numpy as np
 
 from utils import (
+    PYTHON,
     EDGE_SEPARATORS,
     SCRIPT_DIR,
     ensure_dir,
@@ -328,14 +329,14 @@ def _run_resample(args):
         if not lcm_out.exists() or lcm_out.stat().st_size == 0:
             return r, [], []
 
-        run_cmd(["python3", str(SCRIPT_DIR / "convert_results.py"),
+        run_cmd([PYTHON, str(SCRIPT_DIR / "convert_results.py"),
                  "-m", str(table_file), "-i", str(lcm_out),
                  "-o", str(converted)])
 
         if not converted.exists() or converted.stat().st_size == 0:
             return r, [], []
 
-        run_cmd(["python3", str(SCRIPT_DIR / "filter_results.py"),
+        run_cmd([PYTHON, str(SCRIPT_DIR / "filter_results.py"),
                  "-i", str(converted), "-o", str(filtered)])
 
         if not filtered.exists() or filtered.stat().st_size == 0:
@@ -354,7 +355,7 @@ def _run_resample(args):
 
         sig_csv = rdir / "pvalues.csv"
         sig_cmd = [
-            "python3", str(SCRIPT_DIR / "compute_significance_ensemble.py"),
+            PYTHON, str(SCRIPT_DIR / "compute_significance_ensemble.py"),
             "-i", str(filtered), "-o", str(sig_csv),
             "-w", str(weights_path), "--owner", str(owner_path),
             "--graphs_all", str(null_path),
@@ -384,7 +385,8 @@ def _run_resample(args):
 
         all_theta = []
         if want_theta:
-            # theta-maximal family for this resample (same post-filter as Alg 3);
+            # theta-maximal family for this resample (the same post-filter the
+            # observed theta family goes through);
             # select the theta p-values of those patterns from the single pass.
             # A failure of the post-filter on a single pathological resample must
             # NOT crash the whole run: treat it as "this resample contributed no
@@ -392,7 +394,7 @@ def _run_resample(args):
             filtered_theta = rdir / "filtered_theta.txt"
             try:
                 run_cmd([
-                    "python3", str(SCRIPT_DIR / "postfilter_theta.py"),
+                    PYTHON, str(SCRIPT_DIR / "postfilter_theta.py"),
                     "-i", str(filtered), "-o", str(filtered_theta),
                     "-w", str(weights_path), "-owner", str(owner_path),
                     "-theta", str(theta), "-st", str(int(round(sigma))),
@@ -447,7 +449,7 @@ def main():
                          "NULL theta-consensus family in each resample. The "
                          "correctness rule is sigma_exp = floor(theta*sigma); when it falls below this bound the null "
                          "theta family is mined at sigma instead (possibly "
-                         "incomplete, see Chapter 6). Must match the value passed "
+                         "incomplete). Must match the value passed "
                          "to run_pipeline.py so observed and null families agree. "
                          "Set e.g. 2 on breastCancer; leave unset on TRACERx.")
     ap.add_argument("--mc_cutoff", type=int, default=8,
@@ -473,10 +475,10 @@ def main():
                          "Allows FDR curves to be recomputed offline "
                          "without re-running the WY permutations.")
     ap.add_argument("--pvalues_exp",
-                    help="Observed expected-support p-values CSV (Alg 1 family) "
+                    help="Observed expected-support p-values CSV "
                          "for the exp FDR curve.")
     ap.add_argument("--pvalues_theta",
-                    help="Observed theta-consensus p-values CSV (Alg 3 family) "
+                    help="Observed theta-consensus p-values CSV "
                          "for the theta FDR curve.")
     ap.add_argument("--pvalues_csv",
                     help="[deprecated] combined p-values CSV; used as a fallback "
@@ -517,7 +519,7 @@ def main():
     # Candidate mining threshold for the NULL theta family (Section 4.3):
     # sigma_exp = floor(theta*sigma). None keeps the old behaviour (mine at
     # sigma) for theta = 1, for the exp-only test, or when the required
-    # threshold is below --min_mine_sigma (infeasible, Chapter 6).
+    # threshold is below --min_mine_sigma, where mining is not tractable.
     sigma_int = int(round(args.sigma))
     theta_cand = None
     if args.test in ("theta", "both") and args.theta < 1.0:
@@ -527,7 +529,7 @@ def main():
                 print(f"[WY][WARN] theta={args.theta}: correct null candidate "
                       f"threshold sigma_exp={sc} is below --min_mine_sigma="
                       f"{args.min_mine_sigma}; mining the null theta family at "
-                      f"sigma={sigma_int} instead (may be incomplete, Chapter 6).",
+                      f"sigma={sigma_int} instead (may be incomplete).",
                       flush=True)
             else:
                 theta_cand = sc
@@ -621,7 +623,8 @@ def main():
 
     # ---- FDR: empirical estimation ----
     # Requires observed p-values. The exp and theta curves each use their own
-    # observed family (Alg 1 vs Alg 3); a combined --pvalues_csv is accepted
+    # observed family (expected-support vs theta-maximal); a combined
+    # --pvalues_csv is accepted
     # only as a fallback for back-compatibility.
     if args.pvalues_exp or args.pvalues_theta or args.pvalues_csv:
         def _load_col(path, col):

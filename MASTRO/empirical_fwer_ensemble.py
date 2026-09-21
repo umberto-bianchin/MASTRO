@@ -115,7 +115,7 @@ def main():
     for r in range(args.n_datasets):
         # Last element is theta_cand_sigma (see run_wy_correction_ensemble
         # ._run_resample): None = mine the null at sigma itself, the setting
-        # under which the thesis calibration was produced.
+        # under which the reported calibration was produced.
         worker_args.append((
             r, graphs_path, weights_path, owner_path,
             args.sigma, lcmdir, workdir,

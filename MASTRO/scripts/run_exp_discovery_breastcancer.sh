@@ -2,12 +2,13 @@
 # =============================================================================
 # EXPERIMENT: Discovery on breastCancer (real-data significance).
 #
-#   1. run_pipeline.py  -> mine Alg 0/1/2/3 + observed significance
-#                          (expected-support on Alg 1, theta-consensus on Alg 3)
+#   1. run_pipeline.py  -> mine all four families + observed significance
+#                          (expected-support test on the expected-support
+#                          family, theta-consensus test on the theta-maximal one)
 #   2. run_wy_correction_ensemble.py -> WY-corrected thresholds + empirical FDR,
 #      each test scored on ITS OWN family (no merged CSV):
-#         exp   FDR  <- observed Alg 1  vs  null expected-maximal family
-#         theta FDR  <- observed Alg 3  vs  null theta-maximal family
+#         exp   FDR  <- observed expected-support family vs its null family
+#         theta FDR  <- observed theta-maximal family    vs its null family
 #   3. plot_fdr_v2.py   -> FDR(k) curves per (sigma, theta)
 #
 # Independent of the other experiment scripts, safe to run in parallel.

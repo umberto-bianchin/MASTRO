@@ -1,5 +1,5 @@
 # =============================================================================
-# Post-filter for Algorithm 2 (theta-frequent) and Algorithm 3 (theta-maximal).
+# Theta post-filters: theta-frequent (default) and theta-maximal (--maximal).
 #
 # Context:
 #   Each patient i has M_i phylogenetic trees. All trees are pooled into a single
@@ -16,10 +16,10 @@
 #   s_theta(P) = number of patients i for which pi_i(P) >= theta, i.e. how many
 #                patients' weighted presence of P reaches the threshold theta.
 #
-# Output (Algorithm 2, default):
+# Output (default):
 #   theta-frequent candidates: patterns P with s_theta(P) >= sigma_theta.
 #
-# Output (Algorithm 3, --maximal flag):
+# Output (--maximal flag):
 #   theta-maximal candidates: theta-frequent patterns P for which no proper
 #   superset Q has s_theta(Q) = s_theta(P).
 # =============================================================================
@@ -35,7 +35,7 @@ from utils import (
 )
 
 parser = argparse.ArgumentParser(
-    description="Algorithm 2/3 post-filter: theta-frequent (default) or theta-maximal (--maximal)"
+    description="Theta post-filter: theta-frequent (default) or theta-maximal (--maximal)"
 )
 parser.add_argument("-i",       help="input file (filtered results from Stage 1)")
 parser.add_argument("-o",       help="output file")
@@ -44,7 +44,7 @@ parser.add_argument("-owner",   help="owner file (one patient-id per transaction
 parser.add_argument("-theta",   type=float, default=1.0, help="theta threshold in (0,1]")
 parser.add_argument("-st",      type=int,   default=2,   help="sigma_theta: minimum theta-support")
 parser.add_argument("--maximal", action="store_true",
-                    help="if set, run Algorithm 3: keep only theta-maximal patterns (Algorithm 2 + maximality pruning)")
+                    help="keep only theta-maximal patterns (theta-frequent plus maximality pruning)")
 
 args = parser.parse_args()
 
@@ -73,7 +73,7 @@ for pattern_line, occ_line in read_result_pairs(Path(args.i)):
         })
 
 # =============================================================================
-# Step 2 (Algorithm 3 only): enforce theta-maximality within each s_theta bucket.
+# Step 2 (--maximal only): enforce theta-maximality within each s_theta bucket.
 #
 # A pattern P is discarded if a proper superset Q with the same s_theta value
 # exists. Two patterns can only make one non-maximal if they share the same

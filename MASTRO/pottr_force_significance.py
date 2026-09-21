@@ -77,7 +77,7 @@ def main():
                     help="skip trajectories with more non-root nodes; cost blows "
                          "up fast in n (n! automorphisms, and C(tree_nodes, n) "
                          "candidate subsets per tree). 6 covers everything the "
-                         "thesis table reports; raise it at your own risk")
+                         "reported table covers; raise it at your own risk")
     ap.add_argument("--cores", type=int, default=1)
     ap.add_argument("--pottr_sig_name", default="significance_output.txt")
     ap.add_argument("--out", default="",

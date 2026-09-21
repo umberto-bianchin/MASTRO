@@ -1,27 +1,27 @@
 # =============================================================================
-# Weighted MASTRO pipeline (Algorithms 1, 2 and 3) as a standalone command.
+# Weighted mining plus the theta post-filters, as a standalone command.
 #
 # Stage 1: weighted frequent itemset mining (via LCM).
 #   Transaction weights w_t = 1/M_i make the weighted support equal the
 #   expected-support metric, so the support threshold -s is a float (the
-#   expected number of patients). This stage alone is Algorithm 1
-#   (expected-support mining). Omit -owner (and -theta / -st) to stop here.
+#   expected number of patients). Omit -owner (and -theta / -st) to stop after
+#   this stage and get the expected-support family on its own.
 #
 # Stage 2: post-filter for robustness (requires -w and -owner).
-#   Algorithm 2 (default): keep patterns P whose theta-support s_theta(P) is at
-#                          least sigma_theta (see postfilter_theta.py).
-#   Algorithm 3 (-alg3)  : keep only the theta-maximal patterns within each
-#                          s_theta bucket (see postfilter_theta.py --maximal).
+#   default : keep patterns P whose theta-support s_theta(P) is at least
+#             sigma_theta (see postfilter_theta.py).
+#   -alg3   : keep only the theta-maximal patterns within each s_theta bucket
+#             (see postfilter_theta.py --maximal).
 #
 # Example usage:
-#   # Algorithm 1 only (expected support):
+#   # expected support only:
 #   python3 run_MASTRO_weighted.py -g test.txt -s 2 -w weights.txt
 #
-#   # Algorithm 2 (theta-frequent):
+#   # theta-frequent:
 #   python3 run_MASTRO_weighted.py -g test.txt -s 2 -w weights.txt \
 #       -owner owner.txt -theta 0.8 -st 2
 #
-#   # Algorithm 3 (theta-maximal):
+#   # theta-maximal:
 #   python3 run_MASTRO_weighted.py -g test.txt -s 1.2 -w weights.txt \
 #       -owner owner.txt -theta 0.6 -st 2 -alg3
 # =============================================================================
@@ -45,7 +45,7 @@ parser.add_argument("-st", type=int, help="sigma_theta  minimum theta-support (d
 parser.add_argument("-owner", help="owner file: one patient-id per transaction line", default=None)
 
 parser.add_argument("-alg3", action="store_true",
-                    help="if set, run Algorithm 3 (theta-maximal) instead of Algorithm 2 (theta-frequent)")
+                    help="keep only theta-maximal patterns instead of all theta-frequent ones")
 
 args = parser.parse_args()
 
