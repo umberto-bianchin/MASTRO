@@ -16,9 +16,11 @@
 #
 # WHAT IS MEASURED
 # ----------------
-# Frequent-trajectory extraction only. No significance test on either side:
+# Frequent-trajectory extraction only, on both sides. No significance test:
 # POTTR's inline MASTRO test is stubbed out by pottr_timing_run.py, and
-# mastro_timing_run.py never calls compute_significance_ensemble.
+# mastro_timing_run.py never calls compute_significance_ensemble. No theta
+# post-filters either, since POTTR has no analogue of them - use
+# run_pipeline.py for theta families.
 #
 # FAIRNESS
 # --------
@@ -37,7 +39,9 @@
 #
 # OUTPUT
 # ------
-#   $OUTDIR/timing.csv          one row per (cohort, method, threads, k)
+#   $OUTDIR/timing.csv          one row per (cohort, method, threads, k),
+#                               rebuilt from the JSON records after every cell,
+#                               so it is correct even if the run is interrupted
 #   $OUTDIR/cap<N>/...          per-run JSON records and POTTR output dirs
 #
 # Run from the repo's MASTRO/ directory:
@@ -94,7 +98,6 @@ CAP_LIST=${CAP_LIST:-"1 2 3 5 8 0"}
 K_LIST=${K_LIST:-"$(seq 2 50 | tr '\n' ' ')"}
 
 SIGMA_LIST=${SIGMA_LIST:-"2 5"}
-THETA_LIST=${THETA_LIST:-"0.5,1.0"}
 CORES=${CORES:-20}
 TIMEOUT=${TIMEOUT:-3600}
 SEED=${SEED:-0}
@@ -110,6 +113,10 @@ MAX_CONSEC_TIMEOUTS=${MAX_CONSEC_TIMEOUTS:-3}
 # documented data point, but it did not finish even the easiest instance, so
 # it is not worth repeating across the sweep: POTTR_THREADS="$CORES".
 POTTR_THREADS=${POTTR_THREADS:-"1 $CORES"}
+# Gurobi solution pool. run_POTTR defaults to 0, i.e. one optimal solution;
+# the POTTR paper used 50000 when comparing against MASTRO, to collect the
+# co-optimal trajectories. Timings at the two settings are not comparable.
+POOL=${POOL:-0}
 # Pass -v to POTTR so Gurobi prints its MIP log. Worth having when a run is
 # expected to time out: the log shows the gap it was still sitting at.
 POTTR_VERBOSE=${POTTR_VERBOSE:-1}
@@ -189,7 +196,7 @@ for CAP in $CAP_LIST; do
       echo "=== (B) Multi-MASTRO mining, sigma=${S} ==="
       rm -rf "${CDIR}/mastro_work_s${S}"
       if timeout "$TIMEOUT" "$PY" mastro_timing_run.py \
-           --inputs "$ENS_DIR" --sigma "$S" --theta_list "$THETA_LIST" \
+           --inputs "$ENS_DIR" --sigma "$S" \
            --workdir "${CDIR}/mastro_work_s${S}" \
            --label "cap${CAP}" --out "$J"; then
         :
@@ -198,6 +205,10 @@ for CAP in $CAP_LIST; do
         echo "    [TIMEOUT/ERR] mastro sigma=${S}"
       fi
     fi
+    # Refresh the CSV after every cell, not only at the end: these runs get
+    # killed or time out mid-sweep, and a rebuild costs milliseconds against
+    # cells that take hours. The CSV is then always current on disk.
+    "$PY" "${MASTRO_DIR}/rebuild_timing_csv.py" --outdir "$OUTDIR" >/dev/null
   done
 
   # --- (C) POTTR, one ILP per k, at 1 thread and at $CORES threads ---
@@ -217,7 +228,7 @@ for CAP in $CAP_LIST; do
         VFLAG=""; [ "$POTTR_VERBOSE" = "1" ] && VFLAG="--pottr_verbose"
         if timeout "$TIMEOUT" "$PY" "${MASTRO_DIR}/pottr_timing_run.py" \
              --pottr_repo "$POTTR_REPO" --dags "$(cd "$DAGS_DIR" && pwd)" \
-             -k "$K" -c "$TH" $PFLAG $VFLAG \
+             -k "$K" -c "$TH" --pool "$POOL" $PFLAG $VFLAG \
              --output_path "$KOUT" --label "cap${CAP}" --out "$J" 2>&1 | tee "$LOG"; then
           :
         else
@@ -230,6 +241,7 @@ for CAP in $CAP_LIST; do
           echo "    [TIMEOUT/ERR] pottr k=${K} threads=${TH} (log: $LOG)"
         fi
       fi
+      "$PY" "${MASTRO_DIR}/rebuild_timing_csv.py" --outdir "$OUTDIR" >/dev/null
       if "$PY" -c "import json,sys; sys.exit(0 if json.load(open('$J')).get('completed') else 1)"; then
         CONSEC=0
       else

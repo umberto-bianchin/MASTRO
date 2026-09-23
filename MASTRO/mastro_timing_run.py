@@ -1,11 +1,19 @@
 """Time the Multi-MASTRO mining stages on a prepared input directory.
 
 This is the MASTRO half of the POTTR timing comparison. It mines the
-expected-support family and, optionally, the theta post-filters, timing every
-stage separately and writing a JSON record.
+expected-support family, timing every stage separately and writing a JSON
+record.
 
-Significance is deliberately NOT run: the comparison is about extracting the
-frequent trajectories, which is the only thing POTTR also does.
+Two things are deliberately left out, so that both sides are measured on the
+same task - extracting the frequent trajectories, which is all POTTR does:
+
+  * Significance. Neither side is timed with its statistical test.
+  * The theta post-filters. POTTR has no analogue of them, and timing them
+    correctly would mean re-mining the candidates at sigma_exp =
+    floor(theta * sigma) rather than reusing the family mined at sigma, which
+    is what run_pipeline.py does and what the published theta families are
+    built from. Use run_pipeline.py for theta families; this script is for
+    the expected-support comparison only.
 
 The input directory must hold the files written by build_inputs() or by
 breastcancer_to_pottr.py --ensemble_out:
@@ -20,7 +28,6 @@ Stages timed, in order:
     lcm         weighted frequent itemset mining (C)
     convert     numeric ids -> edge labels
     filter      keep relation-complete, maximal itemsets
-    postfilter  theta-frequent / theta-maximal, once per theta (optional)
 
 Mining is single-threaded by construction: LCM is a serial C program and both
 post-processing stages are serial Python. The script pins OMP_NUM_THREADS=1 and
@@ -35,6 +42,7 @@ Usage:
 import argparse
 import json
 import os
+import resource
 import subprocess
 import sys
 import time
@@ -43,11 +51,29 @@ from pathlib import Path
 from utils import SCRIPT_DIR, ensure_dir, run_transnum
 
 
+def child_cpu():
+    """User+system CPU seconds consumed so far by child processes."""
+    r = resource.getrusage(resource.RUSAGE_CHILDREN)
+    return r.ru_utime + r.ru_stime
+
+
 def _time(label, fn, stages):
-    """Run fn(), append {stage,label; elapsed_s} to stages, return its result."""
-    t0 = time.time()
+    """Run fn(), record wall and CPU time, return its result.
+
+    Every stage here is a subprocess, so CPU is taken from RUSAGE_CHILDREN.
+    Recording it turns the thread count from a claim into a measurement: a
+    serial stage spends about one CPU second per wall second, and anything
+    using several cores spends proportionally more. Without this, comparing
+    against a method that is given N threads rests on an assumption about this
+    side that nobody checked.
+    """
+    c0, t0 = child_cpu(), time.time()
     result = fn()
-    stages.append({"stage": label, "elapsed_s": round(time.time() - t0, 3)})
+    wall = time.time() - t0
+    cpu = child_cpu() - c0
+    stages.append({"stage": label, "elapsed_s": round(wall, 3),
+                   "cpu_s": round(cpu, 3),
+                   "cpu_per_wall": round(cpu / wall, 2) if wall > 0.01 else None})
     return result
 
 
@@ -71,8 +97,6 @@ def main():
     ap.add_argument("--inputs", required=True,
                     help="Directory with graphs_all.txt, weights_uniform.txt, owner.txt")
     ap.add_argument("--sigma", type=float, required=True, help="Support threshold")
-    ap.add_argument("--theta_list", default="",
-                    help="Comma-separated thetas for the post-filters; empty = skip them")
     ap.add_argument("--lcmdir", default="./lcm53")
     ap.add_argument("--workdir", default=None,
                     help="Scratch directory for LCM intermediates (default: <inputs>/../mastro_work)")
@@ -108,6 +132,7 @@ def main():
 
     stages = []
     t_total = time.time()
+    cpu_total0 = child_cpu()
 
     _time("transnum", lambda: run_transnum(lcmdir, table_file, graphs, ids_file), stages)
 
@@ -133,18 +158,6 @@ def main():
         check=True, stdout=subprocess.DEVNULL), stages)
 
     n_exp = count_patterns(filtered)
-    families = {"exp": n_exp}
-
-    thetas = [t for t in args.theta_list.split(",") if t.strip()]
-    for theta in thetas:
-        out_alg3 = workdir / f"alg3_theta{theta}.txt"
-        _time(f"postfilter_theta{theta}", lambda o=out_alg3, th=theta: subprocess.run(
-            [sys.executable, str(SCRIPT_DIR / "postfilter_theta.py"),
-             "-i", str(filtered), "-o", str(o), "-w", str(weights),
-             "-owner", str(owner), "-theta", str(th), "-st", str(int(args.sigma)),
-             "--maximal"],
-            check=True, stdout=subprocess.DEVNULL), stages)
-        families[f"theta{theta}"] = count_patterns(out_alg3)
 
     record = {
         "method": "multi-mastro",
@@ -152,20 +165,27 @@ def main():
         "sigma": args.sigma,
         "n_patients": n_patients,
         "n_trees": n_trees,
-        "threads": 1,
-        "threads_note": "LCM is a serial C program; convert/filter are serial Python",
         "stages": stages,
         "total_s": round(time.time() - t_total, 3),
-        "n_trajectories": families,
+        "cpu_total_s": round(child_cpu() - cpu_total0, 3),
+        "cpu_per_wall": round((child_cpu() - cpu_total0) / max(time.time() - t_total, 1e-9), 2),
+        "threads_note": ("mining is serial by construction: LCM is compiled without "
+                         "MULTI_CORE, convert/filter/postfilter are serial Python. "
+                         "cpu_per_wall near 1.0 is the measurement that confirms it."),
+        "n_trajectories": {"exp": n_exp},
+        "status": "ok",
         "completed": True,
     }
 
     out = Path(args.out)
     ensure_dir(out.parent)
     out.write_text(json.dumps(record, indent=2))
-    print(f"[OK] {out}  total {record['total_s']}s  exp-family {n_exp} trajectories")
+    print(f"[OK] {out}  total {record['total_s']}s "
+          f"(cpu {record['cpu_total_s']}s, {record['cpu_per_wall']}x wall)  "
+          f"exp-family {n_exp} trajectories")
     for s in stages:
-        print(f"      {s['stage']:<22} {s['elapsed_s']:>10.3f}s")
+        ratio = "" if s["cpu_per_wall"] is None else f"  {s['cpu_per_wall']:>5.2f}x"
+        print(f"      {s['stage']:<22} {s['elapsed_s']:>10.3f}s{ratio}")
 
 
 if __name__ == "__main__":
