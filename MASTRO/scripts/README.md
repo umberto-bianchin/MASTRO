@@ -172,23 +172,17 @@ Knobs: `MAX_TREES` (trees per patient after deduplication), `K_MIN`/`K_MAX`,
 `run_timing_pottr_vs_mastro.sh`
 
 Times both methods on identical trees, one after the other so neither competes
-with the other for cores. It rebuilds the matched cohort at several
-per-patient tree caps and, for each one, times the Multi-MASTRO mining and
-POTTR at a range of recurrence levels, with a wall-clock budget per invocation.
-A timeout is recorded as a data point, including which stage it was in when it
-was stopped.
-
-The two sides are not given the same number of threads, because they cannot be:
-Multi-MASTRO's mining is serial by construction, while POTTR takes a thread
-count for Gurobi and for building the conflict graph. POTTR is therefore timed
-at one thread and at many, and both are reported.
+with the other for cores. It rebuilds the matched cohort at several per-patient
+tree caps and, for each one, times the Multi-MASTRO mining and POTTR at a range
+of recurrence levels, with a wall-clock budget per invocation. A timeout is
+recorded as a data point, including which stage it was in when it was stopped.
 
 Writes `results/timing_pottr_vs_mastro/`: `timing.csv` with one row per
 configuration and a per-stage breakdown, `environment.txt` recording the
 machine, and a JSON record plus a solver log per run.
 
-Knobs: `CAP_LIST` (trees per patient; `0` means no cap), `K_LIST`, `SIGMA_LIST`,
-`POTTR_THREADS`, `TIMEOUT`, `MAX_CONSEC_TIMEOUTS`, `SKIP_POTTR`, `SKIP_MASTRO`.
+This one is a campaign of several runs rather than a single invocation. The
+last section of this file documents each of them.
 
 ## A note on how significance is computed
 
@@ -198,3 +192,212 @@ post-filter, on the observed data and on every resample alike. The observed
 and null distributions therefore refer to the same set of hypotheses, and
 neither test borrows the other's null. Monte-Carlo p-values are add-one
 smoothed, so none is ever exactly zero.
+
+## Runtime comparison: the campaign in detail
+
+### The pieces
+
+| File | Role |
+|---|---|
+| `scripts/run_timing_pottr_vs_mastro.sh` | the driver: builds matched cohorts, runs both methods one after the other, writes one CSV |
+| `breastcancer_to_pottr.py` | builds a matched cohort: POTTR DAG files and Multi-MASTRO transactions from one identical selection of trees |
+| `mastro_timing_run.py` | times the Multi-MASTRO mining stages on a prepared input directory |
+| `pottr_timing_run.py` | times POTTR by wrapping the functions `run_POTTR` calls, then invoking it unchanged |
+| `rebuild_timing_csv.py` | rebuilds `timing.csv` from the per-run JSON records; idempotent |
+| `pottr_force_significance.py` | applies POTTR's own permutation test to each POTTR trajectory |
+| `pottr_significance.py` | re-scores POTTR trajectories under the multi-tree tests |
+
+Every run writes `<outdir>/timing.csv`, `<outdir>/environment.txt` (machine,
+CPU, RAM, solver version, date) and, per cell, a JSON record with per-stage wall
+time, CPU time, and the CPU-to-wall ratio. `timing.csv` is rebuilt from those
+records after every cell, so it is correct on disk even if the run is
+interrupted; `rebuild_timing_csv.py` is also runnable by hand, which is how
+records written by an older version of the harness get corrected without
+repeating the runs.
+
+### What is measured, and what is not
+
+Frequent-trajectory extraction only, on both sides. No significance test:
+POTTR's inline test is stubbed out, and the Multi-MASTRO side never calls the
+significance stage. No theta post-filters either, since POTTR has no analogue.
+
+Threads are not equalised, because they cannot be. Multi-MASTRO's mining is
+serial by construction: LCM is compiled without `MULTI_CORE`, and the
+downstream stages are serial Python. POTTR takes a thread count for Gurobi and
+for building its conflict graph. Rather than assume this, every stage records
+its CPU-to-wall ratio, so the degree of parallelism is a measurement.
+
+Cohorts are named by their per-patient tree cap. `cap=1` keeps one tree per
+patient and is a pure single-tree cohort; `cap=2` keeps at most two distinct
+trees and is the smallest cohort with genuine multi-tree structure; `cap=0`
+means no cap, the full 37809-tree cohort.
+
+### The runs, in order
+
+#### 1. Shakedown
+
+Smallest possible configuration, to check that both sides start, that Gurobi
+picks up a licence, and to get a first cost per ILP.
+
+```
+CAP_LIST=1 K_LIST="2 3" TIMEOUT=600 CORES=20 \
+  bash scripts/run_timing_pottr_vs_mastro.sh
+```
+
+#### 2. Probe: shape of the cost against k
+
+Five values of k over two cohorts, to find where POTTR becomes expensive before
+committing the machine to a full sweep.
+
+```
+CAP_LIST="1 2" K_LIST="2 5 10 20 50" TIMEOUT=1800 CORES=20 \
+  POTTR_THREADS=20 MAX_CONSEC_TIMEOUTS=0 \
+  OUTDIR=results/timing_pottr_vs_mastro \
+  bash scripts/run_timing_pottr_vs_mastro.sh
+```
+
+Note on reading its output: the cells it marks as timeouts are cells that
+exceeded a 30-minute budget, not cells that cannot be solved. Experiment 3
+completed all of them. Do not read a timeout here as infeasibility.
+
+#### 3. The expensive band, with a real budget
+
+The k values that exceeded the probe's budget, given four hours each.
+
+```
+CAP_LIST="1 2" K_LIST="5 10" SIGMA_LIST="2 5" TIMEOUT=14400 CORES=20 \
+  POTTR_THREADS=20 MAX_CONSEC_TIMEOUTS=0 \
+  OUTDIR=results/timing_hardband \
+  bash scripts/run_timing_pottr_vs_mastro.sh
+```
+
+and the one cell the probe had left incomplete:
+
+```
+CAP_LIST=2 K_LIST=2 SIGMA_LIST=5 TIMEOUT=14400 CORES=20 POTTR_THREADS=20 \
+  OUTDIR=results/timing_hardband \
+  bash scripts/run_timing_pottr_vs_mastro.sh
+```
+
+#### 4. Replicates
+
+Three independent repetitions of the cells that complete quickly, to separate
+signal from run-to-run variation. A separate `OUTDIR` per replicate is required,
+since the driver skips cells whose output already exists.
+
+```
+for REP in 1 2 3; do
+  CAP_LIST="1 2" K_LIST="20 50" SIGMA_LIST="2 5" TIMEOUT=3600 CORES=20 \
+    POTTR_THREADS=20 OUTDIR=results/timing_rep$REP \
+    bash scripts/run_timing_pottr_vs_mastro.sh
+done
+```
+
+Two things this is for: error bars, and checking whether repeated runs return
+the same trajectory. Do not compare timings across separate invocations of the
+driver; the between-session spread is much larger than the within-session one.
+
+#### 5. Full cohort
+
+The complete cohort, one value of k, with the ten-hour budget the POTTR paper
+uses for its own scaling benchmark.
+
+```
+CAP_LIST=0 K_LIST=2 SIGMA_LIST="2 5" TIMEOUT=36000 CORES=20 POTTR_THREADS=20 \
+  OUTDIR=results/timing_fullcohort \
+  bash scripts/run_timing_pottr_vs_mastro.sh
+```
+
+This cohort needs 6.6e8 cross-patient tree pairs in POTTR's conflict graph,
+which `run_POTTR` materialises in memory before solving anything. Expect the
+conflict stage to dominate. `pottr_timing_run.py` samples the resident memory
+of the whole process tree every 15 seconds and rewrites its record, so a run
+killed from outside still leaves the stage it was in and how much it held.
+
+#### 6. Solution pool
+
+By default `run_POTTR.py` passes `--solution-pool-size 0`, so Gurobi returns a
+single optimal solution; when several trajectories share the maximum size, which
+one comes back is not fixed. The POTTR paper's own comparison against MASTRO
+instead sets `PoolSearchMode=2` with `PoolSolutions=50000`. The two settings are
+different experiments and their timings are not interchangeable.
+
+```
+CAP_LIST=1 K_LIST="20 50" SIGMA_LIST=5 TIMEOUT=7200 CORES=20 \
+  POTTR_THREADS=20 POOL=50000 \
+  OUTDIR=results/timing_pool50k \
+  bash scripts/run_timing_pottr_vs_mastro.sh
+```
+
+To count how many trajectories came back, and their support in trees against
+their support in distinct patients, rebuild the CSV: those are separate columns.
+`converted_graphs.txt` holds the trajectories themselves, two lines each.
+
+#### 7. Both significance tests on the same trajectories
+
+Applies POTTR's own permutation test and the multi-tree tests to the same
+trajectories, so the two can be compared hypothesis by hypothesis. Run it on a
+cohort with multi-tree patients: on a one-tree-per-patient cohort the multi-tree
+test degenerates to the single-tree one and the comparison says nothing.
+
+```
+D=results/<outdir>/cap2
+
+python3 pottr_force_significance.py \
+  --pottr_dir $D/pottr_t20 --k_range 20,50 \
+  --dags $D/dags --pottr_repo ../POTTR \
+  --max_nodes 6 --cores 20 --out $D/significance_forced.txt
+
+python3 pottr_significance.py \
+  --pottr_dir $D/pottr_t20 --k_range 20,50 \
+  --pottr_sig_global $D/significance_forced.txt \
+  --graphs_all $D/inputs/graphs_all.txt \
+  -w $D/inputs/weights_uniform.txt --owner $D/inputs/owner.txt \
+  --theta 1.0 --null perm --n_jobs 20 --seed 0 \
+  --out $D/pottr_vs_ours.csv
+```
+
+`pottr_force_significance.py` is needed because `run_POTTR` runs its own test
+only when the largest trajectory of a given k is small enough, which leaves
+whole k values unscored, small trajectories included. It re-applies the gate per
+trajectory and never touches POTTR's own output files.
+
+### Knobs specific to the runtime comparison
+
+| Variable | Meaning |
+|---|---|
+| `CAP_LIST` | per-patient tree caps to build cohorts for; `0` means no cap |
+| `K_LIST` | POTTR recurrence levels |
+| `SIGMA_LIST` | Multi-MASTRO support thresholds |
+| `POTTR_THREADS` | thread settings to time POTTR at |
+| `POOL` | Gurobi solution pool size passed to POTTR |
+| `TIMEOUT` | wall-clock budget per invocation |
+| `MAX_CONSEC_TIMEOUTS` | abandon a k-sweep after this many consecutive timeouts; `0` disables |
+| `SKIP_POTTR`, `SKIP_MASTRO` | run only one half |
+| `PY` | interpreter, when the one on PATH is not the one carrying the dependencies |
+| `POTTR_REPO` | POTTR checkout, when the automatic search picks the wrong one |
+
+### Practical notes
+
+Runs resume: every cell whose output exists is skipped, so an interrupted run
+restarts with the same command. Deleting a JSON forces that cell to be redone.
+
+Do not run two timing experiments at once, and do not run one alongside other
+work. These are measurements.
+
+The per-invocation budget is not a tight bound. The solver runs inside C and
+does not return control to the Python signal handler, so a run can exceed its
+`TIMEOUT` by a wide margin; observed overshoots reached 40 percent. Cells marked
+as timeouts are therefore comparable to each other only as "did not finish".
+
+When collecting results, filter by file name rather than by extension: the
+cohort DAG files are `.txt` and there are tens of thousands of them.
+
+```
+rsync -avz --prune-empty-dirs \
+  --include '*/' --include '*.json' --include '*.log' \
+  --include 'timing.csv' --include 'manifest.csv' \
+  --include 'converted_graphs.txt' --include 'environment.txt' \
+  --exclude '*' \
+  <host>:<path>/results/<outdir> <local destination>/
+```
