@@ -35,14 +35,16 @@ NULL=${NULL:-perm}
 MC_SAMPLES=${MC_SAMPLES:-3000}   # per-patient MC draws; dominant cost knob
 MC_CUTOFF=${MC_CUTOFF:-8}        # M_i above which a patient uses MC
 NPY=${NPY:-../data/breastCancer.npy}
+OUT_ROOT=${OUT_ROOT:-results/discovery}
+PLOT_ROOT=${PLOT_ROOT:-results/fdr_plots}
 THETA_CSV=$(echo "$THETA_LIST" | tr ' ' ',')
 
 [ -f "$NPY" ] || { echo "ERROR: $NPY not found" >&2; exit 1; }
 [ -x lcm53/lcm ] || ( echo "building LCM"; cd lcm53 && make )
-mkdir -p results/fdr_plots
+mkdir -p "$PLOT_ROOT" "$OUT_ROOT"
 
 for SIGMA in $SIGMA_LIST; do
-  OUT=results/discovery/breastCancer_sigma${SIGMA}
+  OUT="$OUT_ROOT/breastCancer_sigma${SIGMA}"
 
   echo "=== [1] observed mining + significance: sigma=$SIGMA ==="
   python3 run_pipeline.py \
@@ -58,7 +60,7 @@ for SIGMA in $SIGMA_LIST; do
 
   for THETA in $THETA_LIST; do
     PVAL_THETA="$SIGDIR/alg3_theta${THETA}_pvalues_theta.csv"
-    WYOUT=results/discovery/breastCancer_wy_sigma${SIGMA}_theta${THETA}
+    WYOUT="$OUT_ROOT/breastCancer_wy_sigma${SIGMA}_theta${THETA}"
 
     echo "=== [2] WY/FDR: sigma=$SIGMA theta=$THETA M=$M par=$PAR null=$NULL ==="
     python3 run_wy_correction_ensemble.py \
@@ -78,8 +80,8 @@ for SIGMA in $SIGMA_LIST; do
     python3 plot_fdr_v2.py \
       --fdr_exp   "$WYOUT/fdr_exp.csv" \
       --fdr_theta "$WYOUT/fdr_theta.csv" \
-      --out "results/fdr_plots/breastCancer_sigma${SIGMA}_theta${THETA}.pdf" \
+      --out "$PLOT_ROOT/breastCancer_sigma${SIGMA}_theta${THETA}.pdf" \
       --title "breastCancer sigma=${SIGMA} theta=${THETA}"
   done
 done
-echo "=== discovery (breastCancer) complete -> results/discovery ==="
+echo "=== discovery (breastCancer) complete -> $OUT_ROOT ==="

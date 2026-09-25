@@ -1,0 +1,14 @@
+{
+  "alg0_mastro_random": {
+    "n_patterns": 393
+  },
+  "alg1_expected_uniform": {
+    "n_patterns": 372
+  },
+  "alg2_theta0.5": {
+    "n_patterns": 411
+  },
+  "alg3_theta0.5": {
+    "n_patterns": 411
+  }
+}

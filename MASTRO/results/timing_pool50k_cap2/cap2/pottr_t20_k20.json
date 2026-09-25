@@ -1,0 +1,38 @@
+{
+  "method": "pottr",
+  "label": "cap2",
+  "k": 20,
+  "n_dags": 1759,
+  "threads": 20,
+  "parallel": true,
+  "verbose": true,
+  "solution_pool": 50000,
+  "stages": [
+    {
+      "stage": "read_dags",
+      "elapsed_s": 0.358,
+      "cpu_s": 1.188,
+      "cpu_per_wall": 3.32
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 25.232,
+      "cpu_s": 125.332,
+      "cpu_per_wall": 4.97
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 28.601,
+      "cpu_s": 28.657,
+      "cpu_per_wall": 1.0
+    }
+  ],
+  "status": "timeout",
+  "completed": false,
+  "total_s": 14678.195,
+  "cpu_total_s": 33977.091,
+  "interrupted_in": "ilp",
+  "interrupted_after_s": 14622.083,
+  "peak_rss_mb": 25858.4,
+  "rss_now_mb": 26170.1
+}

@@ -1,0 +1,16 @@
+A,B,intersection,union,jaccard
+alg0_mastro_random,alg1_expected_uniform,64,65,0.9846153846153847
+alg0_mastro_random,alg2_theta0.5,64,65,0.9846153846153847
+alg0_mastro_random,alg2_theta1.0,64,65,0.9846153846153847
+alg0_mastro_random,alg3_theta0.5,64,65,0.9846153846153847
+alg0_mastro_random,alg3_theta1.0,64,65,0.9846153846153847
+alg1_expected_uniform,alg2_theta0.5,64,64,1.0
+alg1_expected_uniform,alg2_theta1.0,64,64,1.0
+alg1_expected_uniform,alg3_theta0.5,64,64,1.0
+alg1_expected_uniform,alg3_theta1.0,64,64,1.0
+alg2_theta0.5,alg2_theta1.0,64,64,1.0
+alg2_theta0.5,alg3_theta0.5,64,64,1.0
+alg2_theta0.5,alg3_theta1.0,64,64,1.0
+alg2_theta1.0,alg3_theta0.5,64,64,1.0
+alg2_theta1.0,alg3_theta1.0,64,64,1.0
+alg3_theta0.5,alg3_theta1.0,64,64,1.0

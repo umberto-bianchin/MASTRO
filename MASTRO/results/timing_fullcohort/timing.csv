@@ -1,0 +1,3 @@
+cohort_cap,n_patients,n_trees,method,threads,param,value,total_s,cpu_total_s,cpu_per_wall,status,n_trajectories,pottr_support,pottr_patients,detail
+0,1315,37809,multi-mastro,1,sigma,5.0,1.845,1.839,1.0,ok,372,,,transnum=1.484@1.0x;lcm=0.187@0.99x;convert=0.049@0.99x;filter=0.122@1.0x
+0,1315,37809,pottr,20,k,2,38664.616,27519.55,,running,,,,read_dags=7.022@4.54x;KILLED_IN=conflict@38166.306s

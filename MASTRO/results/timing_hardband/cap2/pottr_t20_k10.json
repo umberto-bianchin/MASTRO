@@ -1,0 +1,66 @@
+{
+  "method": "pottr",
+  "label": "cap2",
+  "k": 10,
+  "n_dags": 1759,
+  "threads": 20,
+  "parallel": true,
+  "verbose": true,
+  "stages": [
+    {
+      "stage": "read_dags",
+      "elapsed_s": 0.317,
+      "cpu_s": 1.079,
+      "cpu_per_wall": 3.4
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 26.311,
+      "cpu_s": 137.491,
+      "cpu_per_wall": 5.23
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 18.873,
+      "cpu_s": 18.872,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "ilp",
+      "elapsed_s": 2062.566,
+      "cpu_s": 7143.175,
+      "cpu_per_wall": 3.46
+    },
+    {
+      "stage": "support",
+      "elapsed_s": 0.308,
+      "cpu_s": 0.308,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "convert",
+      "elapsed_s": 0.005,
+      "cpu_s": 0.005,
+      "cpu_per_wall": null
+    },
+    {
+      "stage": "significance_SKIPPED",
+      "elapsed_s": 0.0
+    }
+  ],
+  "total_s": 2110.588,
+  "cpu_total_s": 7303.138,
+  "cpu_per_wall": 3.46,
+  "largest_trajectory_nodes": 3,
+  "status": "ok",
+  "completed": true,
+  "n_trajectories": 1,
+  "trajectories": [
+    {
+      "items": "MAP3K1->-PIK3CA 0->-MAP3K1",
+      "support": 60,
+      "n_occurrences": 60,
+      "n_patients": 49
+    }
+  ]
+}

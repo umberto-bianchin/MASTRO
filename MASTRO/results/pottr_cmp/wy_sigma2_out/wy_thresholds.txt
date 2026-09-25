@@ -1,0 +1,3 @@
+alpha=0.01  threshold_exp=6.687025e-06  threshold_theta=8.101852e-06
+alpha=0.05  threshold_exp=2.192578e-05  threshold_theta=2.508361e-05
+alpha=0.10  threshold_exp=4.340278e-05  threshold_theta=4.607105e-05

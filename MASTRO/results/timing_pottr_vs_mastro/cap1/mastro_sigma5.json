@@ -1,0 +1,42 @@
+{
+  "method": "multi-mastro",
+  "label": "cap1",
+  "sigma": 5.0,
+  "n_patients": 1315,
+  "n_trees": 1315,
+  "threads": 1,
+  "threads_note": "LCM is a serial C program; convert/filter are serial Python",
+  "stages": [
+    {
+      "stage": "transnum",
+      "elapsed_s": 0.034
+    },
+    {
+      "stage": "lcm",
+      "elapsed_s": 0.005
+    },
+    {
+      "stage": "convert",
+      "elapsed_s": 0.05
+    },
+    {
+      "stage": "filter",
+      "elapsed_s": 0.047
+    },
+    {
+      "stage": "postfilter_theta0.5",
+      "elapsed_s": 0.181
+    },
+    {
+      "stage": "postfilter_theta1.0",
+      "elapsed_s": 0.174
+    }
+  ],
+  "total_s": 0.493,
+  "n_trajectories": {
+    "exp": 381,
+    "theta0.5": 381,
+    "theta1.0": 381
+  },
+  "completed": true
+}

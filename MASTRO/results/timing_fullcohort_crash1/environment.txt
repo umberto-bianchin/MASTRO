@@ -1,0 +1,13 @@
+date          : 2026-09-22T10:21:08+00:00
+host          : turing
+kernel        : Linux 6.8.0-134-generic x86_64
+cpu model     : Intel(R) Xeon(R) Gold 5220 CPU @ 2.20GHz
+cpu cores     : 72
+memory        : 1.0Ti
+python        : Python 3.12.3
+gurobi        : (13, 0, 1)
+cores knob    : 20
+timeout       : 36000s
+cap list      : 0
+k list        : 2..2
+sigma list    : 2 5

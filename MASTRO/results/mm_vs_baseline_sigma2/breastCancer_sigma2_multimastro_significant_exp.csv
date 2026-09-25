@@ -1,0 +1,4 @@
+trajectory,pattern,n_genes,is_total_order,s_exp,n_patients,pval,wy_threshold,mined_by_multimastro,seeds_hit,seeds_hit_ids,mined_in_seeds,mined_in_seeds_ids
+AKT1 < TP53,AKT1->-TP53,2,yes,19.000000,19,1.119178e-05,4.782517e-05,yes,1,5,10,0;1;2;3;4;5;6;7;8;9
+CBFB < PIK3CA,CBFB->-PIK3CA,2,yes,32.500000,33,2.541932e-06,4.782517e-05,yes,10,0;1;2;3;4;5;6;7;8;9,10,0;1;2;3;4;5;6;7;8;9
+PIK3CA < SF3B1,PIK3CA->-SF3B1,2,yes,19.000000,19,5.628336e-06,4.782517e-05,yes,10,0;1;2;3;4;5;6;7;8;9,10,0;1;2;3;4;5;6;7;8;9

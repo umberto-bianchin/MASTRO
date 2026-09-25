@@ -1,0 +1,110 @@
+{
+  "method": "pottr",
+  "label": "cap1",
+  "k": 20,
+  "n_dags": 1315,
+  "threads": 20,
+  "parallel": true,
+  "verbose": true,
+  "solution_pool": 50000,
+  "stages": [
+    {
+      "stage": "read_dags",
+      "elapsed_s": 0.316,
+      "cpu_s": 1.002,
+      "cpu_per_wall": 3.17
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 13.338,
+      "cpu_s": 69.502,
+      "cpu_per_wall": 5.21
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 22.414,
+      "cpu_s": 22.42,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "ilp",
+      "elapsed_s": 3299.84,
+      "cpu_s": 13473.036,
+      "cpu_per_wall": 4.08
+    },
+    {
+      "stage": "support",
+      "elapsed_s": 0.926,
+      "cpu_s": 0.926,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "convert",
+      "elapsed_s": 0.008,
+      "cpu_s": 0.008,
+      "cpu_per_wall": null
+    },
+    {
+      "stage": "significance_SKIPPED",
+      "elapsed_s": 0.0
+    }
+  ],
+  "total_s": 3338.12,
+  "cpu_total_s": 13568.16,
+  "cpu_per_wall": 4.06,
+  "peak_rss_mb": 24130.7,
+  "largest_trajectory_nodes": 3,
+  "status": "ok",
+  "completed": true,
+  "n_trajectories": 8,
+  "trajectories": [
+    {
+      "items": "CDH1->-PIK3CA 0->-CDH1",
+      "support": 100,
+      "n_occurrences": 100,
+      "n_patients": 100
+    },
+    {
+      "items": "TP53->-PIK3CA 0->-TP53",
+      "support": 85,
+      "n_occurrences": 85,
+      "n_patients": 85
+    },
+    {
+      "items": "CDH1->-KMT2C 0->-CDH1",
+      "support": 23,
+      "n_occurrences": 23,
+      "n_patients": 23
+    },
+    {
+      "items": "TP53->-KMT2C 0->-TP53",
+      "support": 29,
+      "n_occurrences": 29,
+      "n_patients": 29
+    },
+    {
+      "items": "TP53->-RB1 0->-TP53",
+      "support": 21,
+      "n_occurrences": 21,
+      "n_patients": 21
+    },
+    {
+      "items": "0->-PIK3CA PIK3CA->-KMT2C",
+      "support": 34,
+      "n_occurrences": 34,
+      "n_patients": 34
+    },
+    {
+      "items": "CDH1->-TP53 0->-CDH1",
+      "support": 25,
+      "n_occurrences": 25,
+      "n_patients": 25
+    },
+    {
+      "items": "TP53->-PTEN 0->-TP53",
+      "support": 38,
+      "n_occurrences": 38,
+      "n_patients": 38
+    }
+  ]
+}

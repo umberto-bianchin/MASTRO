@@ -1,0 +1,24 @@
+{
+  "n_patients": 1315,
+  "drop_gl": true,
+  "trees_per_patient": {
+    "min": 1,
+    "median": 1.0,
+    "max": 6332,
+    "mean": 28.75209125475285,
+    "p25": 1.0,
+    "p75": 2.0
+  },
+  "fraction_patients_same_mutation_set_across_trees": 1.0,
+  "global_unique_mutations": 420,
+  "tree_mutations": {
+    "min": 2,
+    "median": 11.0,
+    "max": 34
+  },
+  "patient_mutations_intersection_union_summary": {
+    "min_intersection": 2,
+    "min_union": 2,
+    "max_union": 34
+  }
+}

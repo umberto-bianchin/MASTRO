@@ -1,0 +1,16 @@
+cohort_cap,n_patients,n_trees,method,threads,param,value,total_s,cpu_total_s,cpu_per_wall,status,n_trajectories,pottr_support,pottr_patients,detail
+1,1315,1315,multi-mastro,1,sigma,2.0,76.659,,,ok,2594,,,transnum=0.059;lcm=3.771;convert=27.674;filter=44.341;postfilter_theta0.5=0.431;postfilter_theta1.0=0.371
+1,1315,1315,multi-mastro,1,sigma,5.0,0.493,,,ok,381,,,transnum=0.034;lcm=0.005;convert=0.05;filter=0.047;postfilter_theta0.5=0.181;postfilter_theta1.0=0.174
+1,1315,1315,pottr,1,k,2,1799.705,,,timeout,,,,read_dags=0.548;conflict=56.353;KILLED_IN=ilp@1741.462s
+1,1315,1315,pottr,20,k,2,1101.926,,,ok,1,2,2,read_dags=0.312;conflict=15.252;conflict=14.466;ilp=1070.036;support=0.282;convert=0.004;significance_SKIPPED=0.0
+1,1315,1315,pottr,20,k,5,1802.13,,,timeout,,,,read_dags=0.289;conflict=22.902;conflict=25.744;KILLED_IN=ilp@1752.051s
+1,1315,1315,pottr,20,k,10,1802.817,,,timeout,,,,read_dags=0.303;conflict=14.616;conflict=15.191;KILLED_IN=ilp@1771.581s
+1,1315,1315,pottr,20,k,20,245.7,,,ok,1,34,34,read_dags=0.284;conflict=14.336;conflict=14.289;ilp=215.358;support=0.216;convert=0.025;significance_SKIPPED=0.0
+1,1315,1315,pottr,20,k,50,175.958,,,ok,1,85,85,read_dags=0.281;conflict=15.375;conflict=20.473;ilp=137.801;support=0.259;convert=0.008;significance_SKIPPED=0.0
+2,1315,1759,multi-mastro,1,sigma,2.0,76.478,,,ok,2492,,,transnum=0.095;lcm=4.371;convert=26.762;filter=44.508;postfilter_theta0.5=0.363;postfilter_theta1.0=0.368
+2,1315,1759,multi-mastro,1,sigma,5.0,0.523,,,ok,380,,,transnum=0.049;lcm=0.013;convert=0.05;filter=0.044;postfilter_theta0.5=0.18;postfilter_theta1.0=0.184
+2,1315,1759,pottr,20,k,2,2056.65,,,timeout,,,,read_dags=0.353;conflict=40.499;conflict=30.85;KILLED_IN=ilp@1982.927s
+2,1315,1759,pottr,20,k,5,2580.906,,,timeout,,,,read_dags=0.327;conflict=24.281;conflict=28.391;KILLED_IN=ilp@2526.039s
+2,1315,1759,pottr,20,k,10,1804.562,,,timeout,,,,read_dags=0.298;conflict=25.783;conflict=27.047;KILLED_IN=ilp@1749.89s
+2,1315,1759,pottr,20,k,20,616.455,,,ok,1,38,27,read_dags=0.312;conflict=28.962;conflict=24.301;ilp=560.82;support=0.296;convert=0.004;significance_SKIPPED=0.0
+2,1315,1759,pottr,20,k,50,261.221,,,ok,1,131,101,read_dags=0.289;conflict=26.743;conflict=19.832;ilp=211.638;support=0.353;convert=0.006;significance_SKIPPED=0.0

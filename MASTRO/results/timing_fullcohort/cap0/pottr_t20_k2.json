@@ -1,0 +1,25 @@
+{
+  "method": "pottr",
+  "label": "cap0",
+  "k": 2,
+  "n_dags": 37809,
+  "threads": 20,
+  "parallel": true,
+  "verbose": true,
+  "stages": [
+    {
+      "stage": "read_dags",
+      "elapsed_s": 7.022,
+      "cpu_s": 31.912,
+      "cpu_per_wall": 4.54
+    }
+  ],
+  "status": "running",
+  "completed": false,
+  "total_s": 38664.616,
+  "cpu_total_s": 27519.55,
+  "interrupted_in": "conflict",
+  "interrupted_after_s": 38166.306,
+  "peak_rss_mb": 1832079.8,
+  "rss_now_mb": 1314434.2
+}

@@ -1,0 +1,66 @@
+{
+  "method": "pottr",
+  "label": "cap1",
+  "k": 5,
+  "n_dags": 1315,
+  "threads": 20,
+  "parallel": true,
+  "verbose": true,
+  "stages": [
+    {
+      "stage": "read_dags",
+      "elapsed_s": 0.363,
+      "cpu_s": 1.114,
+      "cpu_per_wall": 3.07
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 14.066,
+      "cpu_s": 75.3,
+      "cpu_per_wall": 5.35
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 12.864,
+      "cpu_s": 12.862,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "ilp",
+      "elapsed_s": 1379.42,
+      "cpu_s": 5316.427,
+      "cpu_per_wall": 3.85
+    },
+    {
+      "stage": "support",
+      "elapsed_s": 0.235,
+      "cpu_s": 0.235,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "convert",
+      "elapsed_s": 0.005,
+      "cpu_s": 0.005,
+      "cpu_per_wall": null
+    },
+    {
+      "stage": "significance_SKIPPED",
+      "elapsed_s": 0.0
+    }
+  ],
+  "total_s": 1408.898,
+  "cpu_total_s": 5407.889,
+  "cpu_per_wall": 3.84,
+  "largest_trajectory_nodes": 4,
+  "status": "ok",
+  "completed": true,
+  "n_trajectories": 1,
+  "trajectories": [
+    {
+      "items": "PTEN->-NF1 0->-TP53 TP53->-PTEN",
+      "support": 5,
+      "n_occurrences": 5,
+      "n_patients": 5
+    }
+  ]
+}

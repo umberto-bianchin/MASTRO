@@ -1,0 +1,4 @@
+cohort_cap,n_patients,n_trees,method,threads,param,value,total_s,cpu_total_s,cpu_per_wall,status,n_trajectories,pottr_support,pottr_patients,detail
+1,1315,1315,multi-mastro,1,sigma,5.0,0.168,0.133,0.79,ok,381,,,transnum=0.042@0.8x;lcm=0.02@0.4x;convert=0.049@0.92x;filter=0.055@0.83x
+1,1315,1315,pottr,20,k,20,3338.12,13568.16,4.06,ok,8,100;85;23;29;21;34;25;38,100;85;23;29;21;34;25;38,read_dags=0.316@3.17x;conflict=13.338@5.21x;conflict=22.414@1.0x;ilp=3299.84@4.08x;support=0.926@1.0x;convert=0.008;significance_SKIPPED=0.0
+1,1315,1315,pottr,20,k,50,2088.974,5027.497,2.41,ok,2,85;100,85;100,read_dags=0.298@3.37x;conflict=13.81@4.94x;conflict=12.684@1.0x;ilp=2060.249@2.4x;support=0.324@1.0x;convert=0.011@1.0x;significance_SKIPPED=0.0

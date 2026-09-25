@@ -1,0 +1,21 @@
+{
+  "method": "pottr",
+  "label": "cap0",
+  "k": 2,
+  "n_dags": 37809,
+  "threads": 20,
+  "parallel": true,
+  "verbose": true,
+  "stages": [
+    {
+      "stage": "read_dags",
+      "elapsed_s": 9.266,
+      "cpu_s": 37.042,
+      "cpu_per_wall": 4.0
+    }
+  ],
+  "status": "running",
+  "completed": false,
+  "total_s": 9.268,
+  "cpu_total_s": 37.043
+}

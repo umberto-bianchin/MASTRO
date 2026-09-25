@@ -1,0 +1,66 @@
+{
+  "method": "pottr",
+  "label": "cap2",
+  "k": 2,
+  "n_dags": 1759,
+  "threads": 20,
+  "parallel": true,
+  "verbose": true,
+  "stages": [
+    {
+      "stage": "read_dags",
+      "elapsed_s": 0.362,
+      "cpu_s": 1.151,
+      "cpu_per_wall": 3.18
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 32.248,
+      "cpu_s": 146.481,
+      "cpu_per_wall": 4.54
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 26.099,
+      "cpu_s": 26.095,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "ilp",
+      "elapsed_s": 2388.512,
+      "cpu_s": 7395.347,
+      "cpu_per_wall": 3.1
+    },
+    {
+      "stage": "support",
+      "elapsed_s": 0.424,
+      "cpu_s": 0.424,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "convert",
+      "elapsed_s": 0.005,
+      "cpu_s": 0.005,
+      "cpu_per_wall": null
+    },
+    {
+      "stage": "significance_SKIPPED",
+      "elapsed_s": 0.0
+    }
+  ],
+  "total_s": 2449.489,
+  "cpu_total_s": 7571.344,
+  "cpu_per_wall": 3.09,
+  "largest_trajectory_nodes": 6,
+  "status": "ok",
+  "completed": true,
+  "n_trajectories": 1,
+  "trajectories": [
+    {
+      "items": "NF1->-TSC2 ARID1B->-KMT2C KMT2C->-NF1 0->-CDH1 CDH1->-ARID1B",
+      "support": 4,
+      "n_occurrences": 4,
+      "n_patients": 2
+    }
+  ]
+}

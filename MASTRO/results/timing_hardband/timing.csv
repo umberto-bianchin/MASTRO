@@ -1,0 +1,10 @@
+cohort_cap,n_patients,n_trees,method,threads,param,value,total_s,cpu_total_s,cpu_per_wall,status,n_trajectories,pottr_support,pottr_patients,detail
+1,1315,1315,multi-mastro,1,sigma,2.0,73.637,73.616,1.0,ok,2594,,,transnum=0.032@0.98x;lcm=3.735@1.0x;convert=25.23@1.0x;filter=43.851@1.0x;postfilter_theta0.5=0.379@1.0x;postfilter_theta1.0=0.398@1.0x
+1,1315,1315,multi-mastro,1,sigma,5.0,0.463,0.457,0.99,ok,381,,,transnum=0.035@0.98x;lcm=0.005;convert=0.045@0.99x;filter=0.041@0.99x;postfilter_theta0.5=0.172@1.0x;postfilter_theta1.0=0.162@1.0x
+1,1315,1315,pottr,20,k,5,1408.898,5407.889,3.84,ok,1,5,5,read_dags=0.363@3.07x;conflict=14.066@5.35x;conflict=12.864@1.0x;ilp=1379.42@3.85x;support=0.235@1.0x;convert=0.005;significance_SKIPPED=0.0
+1,1315,1315,pottr,20,k,10,1973.948,7341.996,3.72,ok,1,11,11,read_dags=0.33@2.89x;conflict=14.029@5.35x;conflict=13.442@1.0x;ilp=1944.301@3.73x;support=0.248@1.0x;convert=0.005;significance_SKIPPED=0.0
+2,1315,1759,multi-mastro,1,sigma,2.0,81.724,81.703,1.0,ok,2492,,,transnum=0.045@0.98x;lcm=4.401@1.0x;convert=27.038@1.0x;filter=49.468@1.0x;postfilter_theta0.5=0.375@1.0x;postfilter_theta1.0=0.384@1.0x
+2,1315,1759,multi-mastro,1,sigma,5.0,0.491,0.484,0.99,ok,380,,,transnum=0.044@0.99x;lcm=0.006;convert=0.049@0.99x;filter=0.043@0.99x;postfilter_theta0.5=0.17@1.0x;postfilter_theta1.0=0.176@1.0x
+2,1315,1759,pottr,20,k,2,2449.489,7571.344,3.09,ok,1,4,2,read_dags=0.362@3.18x;conflict=32.248@4.54x;conflict=26.099@1.0x;ilp=2388.512@3.1x;support=0.424@1.0x;convert=0.005;significance_SKIPPED=0.0
+2,1315,1759,pottr,20,k,5,5692.207,16003.797,2.81,ok,1,8,5,read_dags=0.302@4.23x;conflict=27.323@5.14x;conflict=19.183@1.0x;ilp=5642.243@2.81x;support=0.382@1.0x;convert=0.006;significance_SKIPPED=0.0
+2,1315,1759,pottr,20,k,10,2110.588,7303.138,3.46,ok,1,60,49,read_dags=0.317@3.4x;conflict=26.311@5.23x;conflict=18.873@1.0x;ilp=2062.566@3.46x;support=0.308@1.0x;convert=0.005;significance_SKIPPED=0.0

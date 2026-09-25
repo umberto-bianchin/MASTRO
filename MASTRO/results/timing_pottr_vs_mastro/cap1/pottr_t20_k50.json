@@ -1,0 +1,44 @@
+{
+  "method": "pottr",
+  "label": "cap1",
+  "k": 50,
+  "n_dags": 1315,
+  "threads": 20,
+  "parallel": true,
+  "verbose": true,
+  "stages": [
+    {
+      "stage": "read_dags",
+      "elapsed_s": 0.281
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 15.375
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 20.473
+    },
+    {
+      "stage": "ilp",
+      "elapsed_s": 137.801
+    },
+    {
+      "stage": "support",
+      "elapsed_s": 0.259
+    },
+    {
+      "stage": "convert",
+      "elapsed_s": 0.008
+    },
+    {
+      "stage": "significance_SKIPPED",
+      "elapsed_s": 0.0
+    }
+  ],
+  "total_s": 175.958,
+  "largest_trajectory_nodes": 3,
+  "n_output_lines": 2,
+  "status": "ok",
+  "completed": true
+}

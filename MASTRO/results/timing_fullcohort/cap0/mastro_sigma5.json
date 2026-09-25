@@ -1,0 +1,42 @@
+{
+  "method": "multi-mastro",
+  "label": "cap0",
+  "sigma": 5.0,
+  "n_patients": 1315,
+  "n_trees": 37809,
+  "stages": [
+    {
+      "stage": "transnum",
+      "elapsed_s": 1.484,
+      "cpu_s": 1.483,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "lcm",
+      "elapsed_s": 0.187,
+      "cpu_s": 0.186,
+      "cpu_per_wall": 0.99
+    },
+    {
+      "stage": "convert",
+      "elapsed_s": 0.049,
+      "cpu_s": 0.049,
+      "cpu_per_wall": 0.99
+    },
+    {
+      "stage": "filter",
+      "elapsed_s": 0.122,
+      "cpu_s": 0.122,
+      "cpu_per_wall": 1.0
+    }
+  ],
+  "total_s": 1.845,
+  "cpu_total_s": 1.839,
+  "cpu_per_wall": 1.0,
+  "threads_note": "mining is serial by construction: LCM is compiled without MULTI_CORE, convert/filter/postfilter are serial Python. cpu_per_wall near 1.0 is the measurement that confirms it.",
+  "n_trajectories": {
+    "exp": 372
+  },
+  "status": "ok",
+  "completed": true
+}

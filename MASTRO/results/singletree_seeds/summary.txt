@@ -1,0 +1,32 @@
+===== sigma = 2 (FWER <= 0.05) =====
+  seeds used         : 10  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  frequent (Alg 0)   : mean 2638.2 +/- 13.2   min 2613  max 2656
+  significant @FWER  : mean 8.00 +/- 1.61   min 5  max 11
+  significant in ALL seeds (stable core) : 5
+  significant in SOME but not all seeds  : 14
+  examples of seed-dependent trajectories (#seeds significant / total):
+      8/10   TP53->-PTEN
+      4/10   TP53->-NSD1
+      3/10   TP53->-PTPRD
+      3/10   TP53->-NOTCH4
+      2/10   TP53->-ALK
+      2/10   ATR-/-CARD11 TP53->-ATR TP53->-CARD11
+      1/10   TP53->-PTPRS
+      1/10   TP53->-MAP3K1
+
+===== sigma = 5 (FWER <= 0.05) =====
+  seeds used         : 10  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+  frequent (Alg 0)   : mean 393.0 +/- 1.9   min 390  max 397
+  significant @FWER  : mean 17.20 +/- 1.40   min 14  max 19
+  significant in ALL seeds (stable core) : 10
+  significant in SOME but not all seeds  : 12
+  examples of seed-dependent trajectories (#seeds significant / total):
+      9/10   TP53->-PTPRS
+      9/10   TP53->-FLT4
+      8/10   TP53->-PTPRD
+      7/10   TP53->-FAT1
+      6/10   TP53->-NSD1
+      6/10   TP53->-NOTCH4
+      6/10   TP53->-MAP3K1
+      5/10   TP53->-BARD1
+

@@ -1,0 +1,3 @@
+sigma,mode,completed,timed_out,capped,elapsed_s,max_itemsets,t_convert_s,t_filter_real_s,t_postprocess_s,t_stats_s,n_filtered_real,raw_file_lines,raw_file_size_mb,converted_file_size_mb,n_raw,n_valid,n_invalid,n_maximal,pct_spurious,pct_removed_by_maximality,pct_final_vs_raw
+2,weighted,True,False,False,0.01,,0.037,0.043,0.079,0.039,648,3046,0.05,0.08,1523,803,720,614,47.28,23.54,40.32
+3,weighted,True,False,False,0.02,,0.038,0.042,0.08,0.013,225,508,0.01,0.01,254,227,27,224,10.63,1.32,88.19

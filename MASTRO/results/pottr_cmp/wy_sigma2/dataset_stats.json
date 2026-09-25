@@ -1,0 +1,11 @@
+{
+  "n_patients": 1315,
+  "n_transactions": 1759,
+  "trees_per_patient": {
+    "min": 1,
+    "median": 1.0,
+    "max": 2,
+    "mean": 1.3376425855513308
+  },
+  "input_mode": "graphs_txt"
+}

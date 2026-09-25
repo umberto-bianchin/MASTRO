@@ -1,0 +1,55 @@
+{
+  "method": "multi-mastro",
+  "label": "cap2",
+  "sigma": 5.0,
+  "n_patients": 1315,
+  "n_trees": 1759,
+  "stages": [
+    {
+      "stage": "transnum",
+      "elapsed_s": 0.044,
+      "cpu_s": 0.044,
+      "cpu_per_wall": 0.99
+    },
+    {
+      "stage": "lcm",
+      "elapsed_s": 0.006,
+      "cpu_s": 0.006,
+      "cpu_per_wall": null
+    },
+    {
+      "stage": "convert",
+      "elapsed_s": 0.049,
+      "cpu_s": 0.048,
+      "cpu_per_wall": 0.99
+    },
+    {
+      "stage": "filter",
+      "elapsed_s": 0.043,
+      "cpu_s": 0.042,
+      "cpu_per_wall": 0.99
+    },
+    {
+      "stage": "postfilter_theta0.5",
+      "elapsed_s": 0.17,
+      "cpu_s": 0.169,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "postfilter_theta1.0",
+      "elapsed_s": 0.176,
+      "cpu_s": 0.175,
+      "cpu_per_wall": 1.0
+    }
+  ],
+  "total_s": 0.491,
+  "cpu_total_s": 0.484,
+  "cpu_per_wall": 0.99,
+  "threads_note": "mining is serial by construction: LCM is compiled without MULTI_CORE, convert/filter/postfilter are serial Python. cpu_per_wall near 1.0 is the measurement that confirms it.",
+  "n_trajectories": {
+    "exp": 380,
+    "theta0.5": 380,
+    "theta1.0": 375
+  },
+  "completed": true
+}

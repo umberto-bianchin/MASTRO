@@ -1,0 +1,28 @@
+{
+  "method": "pottr",
+  "label": "cap2",
+  "k": 5,
+  "n_dags": 1759,
+  "threads": 20,
+  "parallel": true,
+  "verbose": true,
+  "stages": [
+    {
+      "stage": "read_dags",
+      "elapsed_s": 0.327
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 24.281
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 28.391
+    }
+  ],
+  "status": "timeout",
+  "completed": false,
+  "total_s": 2580.906,
+  "interrupted_in": "ilp",
+  "interrupted_after_s": 2526.039
+}
