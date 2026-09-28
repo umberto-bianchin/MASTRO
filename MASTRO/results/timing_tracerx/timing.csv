@@ -1,0 +1,13 @@
+cohort,n_patients,n_trees,method,threads,param,value,total_s,cpu_total_s,cpu_per_wall,status,n_trajectories,pottr_support,pottr_patients,detail
+tracerx,394,469,multi-mastro,1,sigma,2.0,0.138,0.134,0.97,ok,648,,,transnum=0.027@0.98x;lcm=0.011@0.95x;convert=0.047@0.99x;filter=0.052@0.98x
+tracerx,394,469,multi-mastro,1,sigma,5.0,0.102,0.099,0.97,ok,64,,,transnum=0.024@0.97x;lcm=0.004;convert=0.038@0.99x;filter=0.036@0.98x
+tracerx,394,469,pottr,1,k,2,167.094,167.174,1.0,ok,1,2,2,read_dags=0.308@1.2x;conflict=11.787@1.0x;ilp=154.681@1.0x;dedup=0.0;support=0.104@1.0x;convert=0.004;significance_SKIPPED=0.0
+tracerx,394,469,pottr,1,k,5,118.637,118.722,1.0,ok,1,5,5,read_dags=0.293@1.22x;conflict=12.102@1.0x;ilp=105.961@1.0x;dedup=0.0;support=0.108@1.0x;convert=0.004;significance_SKIPPED=0.0
+tracerx,394,469,pottr,1,k,10,54.213,54.29,1.0,ok,1,11,10,read_dags=0.34@1.2x;conflict=12.226@1.0x;ilp=41.345@1.0x;dedup=0.0;support=0.09@1.0x;convert=0.003;significance_SKIPPED=0.0
+tracerx,394,469,pottr,1,k,20,34.094,34.155,1.0,ok,1,35,35,read_dags=0.345@1.17x;conflict=11.969@1.0x;ilp=21.486@1.0x;dedup=0.0;support=0.088@1.0x;convert=0.003;significance_SKIPPED=0.0
+tracerx,394,469,pottr,1,k,50,32.451,32.522,1.0,ok,1,205,193,read_dags=0.338@1.18x;conflict=12.792@1.0x;ilp=18.931@1.0x;dedup=0.0;support=0.091@1.0x;convert=0.004;significance_SKIPPED=0.0
+tracerx,394,469,pottr,20,k,2,81.196,417.269,5.14,ok,1,2,2,read_dags=0.247@3.54x;conflict=3.078@5.08x;conflict=1.536@1.0x;ilp=76.04@5.25x;dedup=0.0;support=0.098@1.0x;convert=0.004;significance_SKIPPED=0.0
+tracerx,394,469,pottr,20,k,5,72.264,322.977,4.47,ok,1,5,5,read_dags=0.28@2.83x;conflict=2.553@5.79x;conflict=1.368@1.0x;ilp=67.655@4.52x;dedup=0.0;support=0.091@1.0x;convert=0.012@1.0x;significance_SKIPPED=0.0
+tracerx,394,469,pottr,20,k,10,36.897,129.459,3.51,ok,1,10,10,read_dags=0.223@3.32x;conflict=2.513@5.94x;conflict=1.356@1.0x;ilp=32.544@3.45x;dedup=0.0;support=0.084@1.0x;convert=0.004;significance_SKIPPED=0.0
+tracerx,394,469,pottr,20,k,20,30.149,87.462,2.9,ok,1,35,35,read_dags=0.236@3.15x;conflict=2.611@5.8x;conflict=1.394@1.0x;ilp=25.643@2.73x;dedup=0.0;support=0.086@1.0x;convert=0.004;significance_SKIPPED=0.0
+tracerx,394,469,pottr,20,k,50,23.94,55.788,2.33,ok,1,205,193,read_dags=0.223@3.25x;conflict=2.602@5.88x;conflict=1.452@1.0x;ilp=19.403@1.96x;dedup=0.0;support=0.081@1.0x;convert=0.004;significance_SKIPPED=0.0

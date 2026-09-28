@@ -1,0 +1,68 @@
+{
+  "method": "pottr",
+  "label": "captracerx",
+  "k": 20,
+  "n_dags": 469,
+  "threads": 1,
+  "parallel": false,
+  "verbose": true,
+  "solution_pool": 0,
+  "stages": [
+    {
+      "stage": "read_dags",
+      "elapsed_s": 0.345,
+      "cpu_s": 0.402,
+      "cpu_per_wall": 1.17
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 11.969,
+      "cpu_s": 11.968,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "ilp",
+      "elapsed_s": 21.486,
+      "cpu_s": 21.489,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "dedup",
+      "elapsed_s": 0.0,
+      "cpu_s": 0.0,
+      "cpu_per_wall": null
+    },
+    {
+      "stage": "support",
+      "elapsed_s": 0.088,
+      "cpu_s": 0.088,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "convert",
+      "elapsed_s": 0.003,
+      "cpu_s": 0.003,
+      "cpu_per_wall": null
+    },
+    {
+      "stage": "significance_SKIPPED",
+      "elapsed_s": 0.0
+    }
+  ],
+  "total_s": 34.094,
+  "cpu_total_s": 34.155,
+  "cpu_per_wall": 1.0,
+  "peak_rss_mb": 465.7,
+  "largest_trajectory_nodes": 3,
+  "status": "ok",
+  "completed": true,
+  "n_trajectories": 1,
+  "trajectories": [
+    {
+      "items": "0->-KRAS_M KRAS_M->-TP53_M",
+      "support": 35,
+      "n_occurrences": 35,
+      "n_patients": 35
+    }
+  ]
+}

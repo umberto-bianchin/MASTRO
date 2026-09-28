@@ -54,6 +54,7 @@ set -euo pipefail
 # Locate the code directory rather than assuming a layout: scripts/ sits
 # beside MASTRO/ on the server but inside it in the local checkout, so a fixed
 # relative path works in one place and silently breaks in the other.
+INVOKED_FROM="$(pwd)"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MASTRO_DIR=""
 for CAND in "${SCRIPT_DIR}/../MASTRO" "${SCRIPT_DIR}/.." "${SCRIPT_DIR}/../.."; do
@@ -91,6 +92,36 @@ OUTDIR=${OUTDIR:-results/timing_pottr_vs_mastro}
 # cohort, which is expected to time out on the POTTR side and is included
 # precisely to record that.
 CAP_LIST=${CAP_LIST:-"1 2 3 5 8 0"}
+# A cohort that already exists, instead of one built from breastCancer.npy.
+# Point it at a directory holding inputs/ (graphs_all.txt, owner.txt,
+# weights_uniform.txt) and dags/ (one file per tree, named <patient>-<tree>).
+# CAP_LIST is then ignored: there is one cohort and it is taken as given.
+# Both sides must describe the SAME trees; nothing here checks that for you.
+COHORT_DIR=${COHORT_DIR:-}
+COHORT_NAME=${COHORT_NAME:-prebuilt}
+
+# COHORT_DIR is resolved against the directory the script was INVOKED from, not
+# the code directory it cd's into: a relative path typed at the prompt should
+# mean what it looks like it means.
+if [ -n "$COHORT_DIR" ]; then
+  case "$COHORT_DIR" in
+    /*) ;;
+    *) if [ -d "${INVOKED_FROM}/${COHORT_DIR}" ]; then
+         COHORT_DIR="${INVOKED_FROM}/${COHORT_DIR}"
+       fi ;;
+  esac
+  for sub in inputs dags; do
+    [ -d "${COHORT_DIR}/${sub}" ] || {
+      echo "[err] COHORT_DIR=${COHORT_DIR} has no ${sub}/ subdirectory."
+      echo "      It must hold inputs/ (graphs_all.txt, owner.txt, weights_uniform.txt)"
+      echo "      and dags/ (one file per tree, named <patient>-<tree>)."
+      exit 1; }
+  done
+  COHORT_DIR="$(cd "$COHORT_DIR" && pwd)"
+  # so that the run is labelled by the cohort actually used
+  CAP_LIST="$COHORT_NAME"
+  echo "[info] prebuilt cohort: $COHORT_DIR"
+fi
 
 # POTTR solves one ILP per recurrence level, so the full sweep is the honest
 # comparison: Multi-MASTRO returns the whole family for a given sigma in a
@@ -155,7 +186,11 @@ fi
   echo "gurobi        : $("$PY" -c 'import gurobipy; print(gurobipy.gurobi.version())' 2>/dev/null || echo unknown)"
   echo "cores knob    : $CORES"
   echo "timeout       : ${TIMEOUT}s"
-  echo "cap list      : $CAP_LIST"
+  if [ -n "$COHORT_DIR" ]; then
+    echo "cohort        : $COHORT_NAME (prebuilt, $COHORT_DIR)"
+  else
+    echo "cap list      : $CAP_LIST"
+  fi
   echo "k list        : $(echo $K_LIST | tr ' ' '\n' | head -1)..$(echo $K_LIST | tr ' ' '\n' | tail -1)"
   echo "sigma list    : $SIGMA_LIST"
 } > "${OUTDIR}/environment.txt"
@@ -164,14 +199,24 @@ cat "${OUTDIR}/environment.txt"
 # ---- sweep ------------------------------------------------------------------
 for CAP in $CAP_LIST; do
   echo
-  echo "############ cohort: max_trees=${CAP} ############"
-  CDIR="${OUTDIR}/cap${CAP}"
-  ENS_DIR="${CDIR}/inputs"
-  DAGS_DIR="${CDIR}/dags"
-  mkdir -p "$CDIR"
+  if [ -n "$COHORT_DIR" ]; then
+    echo "############ cohort: ${COHORT_NAME} (prebuilt) ############"
+    CDIR="${OUTDIR}/${COHORT_NAME}"
+    ENS_DIR="$(cd "$COHORT_DIR/inputs" && pwd)"
+    DAGS_DIR="$(cd "$COHORT_DIR/dags" && pwd)"
+    mkdir -p "$CDIR"
+  else
+    echo "############ cohort: max_trees=${CAP} ############"
+    CDIR="${OUTDIR}/cap${CAP}"
+    ENS_DIR="${CDIR}/inputs"
+    DAGS_DIR="${CDIR}/dags"
+    mkdir -p "$CDIR"
+  fi
 
   # --- (A) matched cohort: same trees to both methods ---
-  if [ -f "${ENS_DIR}/manifest.csv" ]; then
+  if [ -n "$COHORT_DIR" ]; then
+    echo "=== (A) using prebuilt cohort at $COHORT_DIR ==="
+  elif [ -f "${ENS_DIR}/manifest.csv" ]; then
     echo "[SKIP] cohort cap=${CAP} already built"
   else
     echo "=== (A) build matched cohort, max_trees=${CAP} ==="
@@ -182,7 +227,11 @@ for CAP in $CAP_LIST; do
       --max_trees "$MT" --n_patients 0 --seed "$SEED"
   fi
 
-  N_PAT=$(awk -F, 'NR>1{print $1}' "${ENS_DIR}/manifest.csv" | sort -u | wc -l | tr -d ' ')
+  if [ -f "${ENS_DIR}/manifest.csv" ]; then
+    N_PAT=$(awk -F, 'NR>1{print $1}' "${ENS_DIR}/manifest.csv" | sort -u | wc -l | tr -d ' ')
+  else
+    N_PAT=$(sort -u "${ENS_DIR}/owner.txt" | grep -cve '^[[:space:]]*$' | tr -d ' ')
+  fi
   N_TREE=$(grep -cve '^[[:space:]]*$' "${ENS_DIR}/graphs_all.txt" | tr -d ' ')
   echo "    cohort: ${N_PAT} patients, ${N_TREE} trees"
 

@@ -1,0 +1,68 @@
+{
+  "method": "pottr",
+  "label": "captracerx",
+  "k": 10,
+  "n_dags": 469,
+  "threads": 1,
+  "parallel": false,
+  "verbose": true,
+  "solution_pool": 0,
+  "stages": [
+    {
+      "stage": "read_dags",
+      "elapsed_s": 0.34,
+      "cpu_s": 0.408,
+      "cpu_per_wall": 1.2
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 12.226,
+      "cpu_s": 12.226,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "ilp",
+      "elapsed_s": 41.345,
+      "cpu_s": 41.353,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "dedup",
+      "elapsed_s": 0.0,
+      "cpu_s": 0.0,
+      "cpu_per_wall": null
+    },
+    {
+      "stage": "support",
+      "elapsed_s": 0.09,
+      "cpu_s": 0.09,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "convert",
+      "elapsed_s": 0.003,
+      "cpu_s": 0.003,
+      "cpu_per_wall": null
+    },
+    {
+      "stage": "significance_SKIPPED",
+      "elapsed_s": 0.0
+    }
+  ],
+  "total_s": 54.213,
+  "cpu_total_s": 54.29,
+  "cpu_per_wall": 1.0,
+  "peak_rss_mb": 532.5,
+  "largest_trajectory_nodes": 3,
+  "status": "ok",
+  "completed": true,
+  "n_trajectories": 1,
+  "trajectories": [
+    {
+      "items": "0->-TP53_M TP53_M->-STK11_M",
+      "support": 11,
+      "n_occurrences": 11,
+      "n_patients": 10
+    }
+  ]
+}

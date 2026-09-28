@@ -15,7 +15,7 @@ import json
 from pottr_timing_run import read_trajectories
 from pathlib import Path
 
-HEADER = ["cohort_cap", "n_patients", "n_trees", "method", "threads",
+HEADER = ["cohort", "n_patients", "n_trees", "method", "threads",
           "param", "value", "total_s", "cpu_total_s", "cpu_per_wall", "status",
           "n_trajectories", "pottr_support", "pottr_patients", "detail"]
 
@@ -62,6 +62,16 @@ def cohort_size(cohort_dir: Path):
     if manifest.exists():
         rows = list(csv.DictReader(open(manifest)))
         return len(rows), sum(int(r["n_trees"]) for r in rows)
+
+    # A prebuilt cohort keeps its inputs outside the run directory, so fall
+    # back to the Multi-MASTRO record, which measured both while mining.
+    for j in sorted(cohort_dir.glob("mastro_*.json")):
+        try:
+            rec = json.load(open(j))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if rec.get("n_patients") and rec.get("n_trees"):
+            return rec["n_patients"], rec["n_trees"]
     return "", ""
 
 
@@ -94,9 +104,15 @@ def row_from(rec, cap, pats, trees, cohort_dir):
 
 
 def sort_key(r):
-    # cohort cap 0 means "no cap", i.e. the largest cohort: sort it last.
-    cap = int(r[0]) if str(r[0]).isdigit() else 0
-    return (cap if cap else 10 ** 9, r[3], int(r[4] or 0), float(r[6] or 0))
+    # Numeric cohort labels are tree caps and sort by size, with 0 meaning "no
+    # cap" and therefore last; a named cohort sorts after the numeric ones.
+    label = str(r[0])
+    if label.isdigit():
+        cap = int(label)
+        first = (0, cap if cap else 10 ** 9, "")
+    else:
+        first = (1, 0, label)
+    return (first, r[3], int(r[4] or 0), float(r[6] or 0))
 
 
 def main():
@@ -106,10 +122,13 @@ def main():
     out = Path(args.outdir)
 
     rows = []
-    for cdir in sorted(out.glob("cap*")):
+    # Any subdirectory holding run records is a cohort. The driver names them
+    # cap<N> when it builds them from a tree cap, but a prebuilt cohort carries
+    # its own name, so do not assume the prefix.
+    for cdir in sorted(d for d in out.iterdir() if d.is_dir()):
         if not cdir.is_dir():
             continue
-        cap = cdir.name[3:]
+        cap = cdir.name[3:] if cdir.name.startswith("cap") else cdir.name
         pats, trees = cohort_size(cdir)
         for j in sorted(cdir.glob("*.json")):
             try:

@@ -1,0 +1,68 @@
+{
+  "method": "pottr",
+  "label": "captracerx",
+  "k": 50,
+  "n_dags": 469,
+  "threads": 1,
+  "parallel": false,
+  "verbose": true,
+  "solution_pool": 0,
+  "stages": [
+    {
+      "stage": "read_dags",
+      "elapsed_s": 0.338,
+      "cpu_s": 0.4,
+      "cpu_per_wall": 1.18
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 12.792,
+      "cpu_s": 12.792,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "ilp",
+      "elapsed_s": 18.931,
+      "cpu_s": 18.938,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "dedup",
+      "elapsed_s": 0.0,
+      "cpu_s": 0.0,
+      "cpu_per_wall": null
+    },
+    {
+      "stage": "support",
+      "elapsed_s": 0.091,
+      "cpu_s": 0.091,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "convert",
+      "elapsed_s": 0.004,
+      "cpu_s": 0.004,
+      "cpu_per_wall": null
+    },
+    {
+      "stage": "significance_SKIPPED",
+      "elapsed_s": 0.0
+    }
+  ],
+  "total_s": 32.451,
+  "cpu_total_s": 32.522,
+  "cpu_per_wall": 1.0,
+  "peak_rss_mb": 466.2,
+  "largest_trajectory_nodes": 2,
+  "status": "ok",
+  "completed": true,
+  "n_trajectories": 1,
+  "trajectories": [
+    {
+      "items": "0->-TP53_M",
+      "support": 205,
+      "n_occurrences": 205,
+      "n_patients": 193
+    }
+  ]
+}
