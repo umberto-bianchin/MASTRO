@@ -1,0 +1,2 @@
+k_values,n_nodes,n_resolved_rel,n_edges_full,support_trees,support_patients,s_exp,s_theta,mastro_pval_exp,mastro_pval_theta,pottr_pval_perm
+7,2,1,2,35,7,7.000000,7,1.718750e-01,1.718750e-01,0.003300223983405459
