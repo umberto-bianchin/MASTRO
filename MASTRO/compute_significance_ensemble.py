@@ -68,7 +68,7 @@ from utils import (
 # Pairwise-relation encoding
 # =====================================================================
 # Encode each pairwise relation as a small integer for fast tensor matching
-REL_NONE = 0  # disagreement across trees / no item / diagonal
+REL_NONE = 0  # no constraint (pattern side) / alteration absent from a tree
 REL_ANC_FWD = 1  # a is ancestor of b
 REL_ANC_REV = 2  # b is ancestor of a
 REL_INC = 3  # a and b incomparable (different branches)
@@ -121,6 +121,12 @@ def build_rel_tensor(trees_rel_list, alterations):
     alt_idx = {a: i for i, a in enumerate(alterations)}
     rel = np.zeros((M, n, n), dtype=np.int8)
     for j, rd in enumerate(trees_rel_list):
+        present = sorted({alt_idx[u] for pair in rd for u in pair
+                          if u in alt_idx})
+        if present:
+            block = np.array(present, dtype=np.intp)
+            rel[np.ix_([j], block, block)] = REL_INC
+            rel[j, block, block] = REL_UNC
         for (x, y), code in rd.items():
             if x not in alt_idx or y not in alt_idx:
                 # Skip alterations that do not appear in this patient's set
@@ -164,9 +170,10 @@ def pattern_expected_matrix(pattern_items):
 # Generate null placements of trajectory nodes onto patient alterations
 def build_placements_exact(n_alt, k, null_model, max_placements):
     """Build the full placement matrix, or return None if it is too large"""
-    if k > n_alt:
-        return np.zeros((0, k), dtype=np.int32)
     if null_model == "perm":
+        # More pattern nodes than alterations: no injective placement exists
+        if k > n_alt:
+            return np.zeros((0, k), dtype=np.int32)
         # Injective placements: pattern nodes map to distinct alterations
         total = math.perm(n_alt, k)
         if total > max_placements:
@@ -183,9 +190,10 @@ def build_placements_exact(n_alt, k, null_model, max_placements):
 
 def build_placements_mc(n_alt, k, B, null_model, rng):
     """Sample a placement matrix from the selected null model"""
-    if k > n_alt:
-        return np.zeros((0, k), dtype=np.int32)
     if null_model == "perm":
+        # More pattern nodes than alterations: no injective placement exists
+        if k > n_alt:
+            return np.zeros((0, k), dtype=np.int32)
         # Sample without replacement to mimic a random permutation
         placements = np.empty((B, k), dtype=np.int32)
         for b in range(B):
@@ -270,6 +278,9 @@ def compute_phi_i(rel_tensor, weights_i, pattern_items, alterations,
     # Transform trajectory in k x k matrix
     pnodes, expected = pattern_expected_matrix(pattern_items)
     k = len(pnodes)
+    # k > n_alt is safe to reject for both nulls: the pattern alterations are
+    # distinct, so it implies at least one of them is outside the patient's set,
+    # which the next guard rejects anyway
     if k == 0 or k > n_alt:
         return {0: 1.0}, False
 
