@@ -25,7 +25,18 @@
 # or launch several (SIGMA,SEED) shards concurrently with disjoint SEEDS lists.
 # =============================================================================
 set -euo pipefail
-cd "$(dirname "$0")/.."
+# Locate the directory that holds run_pipeline.py, robustly to both layouts:
+# scripts/ inside the package (cd ..) or scripts/ as a sibling of MASTRO/
+# (cd ../MASTRO, e.g. the server 'code/' bundle).
+SDIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SDIR/../run_pipeline.py" ]; then
+  cd "$SDIR/.."
+elif [ -f "$SDIR/../MASTRO/run_pipeline.py" ]; then
+  cd "$SDIR/../MASTRO"
+else
+  echo "ERROR: cannot locate run_pipeline.py from $SDIR" >&2
+  exit 1
+fi
 
 SEEDS=${SEEDS:-"0 1 2 3 4 5 6 7 8 9"}
 SIGMA_LIST=${SIGMA_LIST:-"2 5"}

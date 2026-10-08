@@ -15,8 +15,7 @@ depend on M. Two cohort designs (--design):
          n_ab carriers of A->B (C a leaf); the non-carriers cycle through the
          other 5 orders (B->A, A->C, C->A, B->C, C->B), so no competing
          trajectory is shared by >= n_ab patients and the ILP at k = n_ab
-         returns A->B deterministically. Discriminates under the perm null,
-         the one used in the thesis (tab:pottr).
+         returns A->B deterministically. Discriminates under the perm null.
 
   all_orders  K alterations, and every patient carries ALL K! linear orders as
          chains, each with weight 1/K!. The cohort therefore holds no evidence

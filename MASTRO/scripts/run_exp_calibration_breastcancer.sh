@@ -12,7 +12,18 @@
 # Heavier than discovery (N minings under the null), give it its own cores.
 # =============================================================================
 set -euo pipefail
-cd "$(dirname "$0")/.."
+# Locate the directory that holds run_pipeline.py, robustly to both layouts:
+# scripts/ inside the package (cd ..) or scripts/ as a sibling of MASTRO/
+# (cd ../MASTRO, e.g. the server 'code/' bundle).
+SDIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SDIR/../run_pipeline.py" ]; then
+  cd "$SDIR/.."
+elif [ -f "$SDIR/../MASTRO/run_pipeline.py" ]; then
+  cd "$SDIR/../MASTRO"
+else
+  echo "ERROR: cannot locate run_pipeline.py from $SDIR" >&2
+  exit 1
+fi
 
 PAR=${PAR:-4}
 SIGMA_LIST=${SIGMA_LIST:-"2"}

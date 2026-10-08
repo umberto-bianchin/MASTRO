@@ -7,7 +7,18 @@
 # Independent of the other experiment scripts, safe to run in parallel.
 # =============================================================================
 set -euo pipefail
-cd "$(dirname "$0")/.."
+# Locate the directory that holds run_pipeline.py, robustly to both layouts:
+# scripts/ inside the package (cd ..) or scripts/ as a sibling of MASTRO/
+# (cd ../MASTRO, e.g. the server 'code/' bundle).
+SDIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SDIR/../run_pipeline.py" ]; then
+  cd "$SDIR/.."
+elif [ -f "$SDIR/../MASTRO/run_pipeline.py" ]; then
+  cd "$SDIR/../MASTRO"
+else
+  echo "ERROR: cannot locate run_pipeline.py from $SDIR" >&2
+  exit 1
+fi
 
 M=${M:-2000}
 PAR=${PAR:-4}
@@ -16,11 +27,20 @@ THETA_LIST=${THETA_LIST:-"0.5 1.0"}
 NULL=${NULL:-perm}
 MC_SAMPLES=${MC_SAMPLES:-3000}   # per-patient MC draws; dominant cost knob
 MC_CUTOFF=${MC_CUTOFF:-8}        # M_i above which a patient uses MC
+# Floor on the mining threshold of the theta-consensus family. The correct
+# threshold is floor(theta*sigma); when that drops below this value the family
+# is mined at sigma instead and run_pipeline.py warns it may be incomplete.
+# Empty = no floor, i.e. mine at floor(theta*sigma) however low. Mining at
+# support 1 is intractable on TRACERx (one transaction carries 1006 items), so
+# set this to match the breastCancer script, which passes --min_mine_sigma 2.
+MIN_MINE_SIGMA=${MIN_MINE_SIGMA:-}
 OUT_ROOT=${OUT_ROOT:-results/discovery}
 PLOT_ROOT=${PLOT_ROOT:-results/fdr_plots}
 GRAPHS=../data/TRACERx/graphs_tracerx.txt
 OWNER=../data/TRACERx/owner_tracerx.txt
 THETA_CSV=$(echo "$THETA_LIST" | tr ' ' ',')
+MIN_MINE_ARG=()
+[ -n "$MIN_MINE_SIGMA" ] && MIN_MINE_ARG=(--min_mine_sigma "$MIN_MINE_SIGMA")
 
 [ -f "$GRAPHS" ] || { echo "ERROR: $GRAPHS not found" >&2; exit 1; }
 [ -x lcm53/lcm ] || ( echo "building LCM"; cd lcm53 && make )
@@ -33,6 +53,7 @@ for SIGMA in $SIGMA_LIST; do
   python3 run_pipeline.py \
     --graphs "$GRAPHS" --owner "$OWNER" --sigma "$SIGMA" --seed 0 \
     --theta_list "$THETA_CSV" \
+    ${MIN_MINE_ARG[@]+"${MIN_MINE_ARG[@]}"} \
     --significance --sig_null "$NULL" \
     --sig_mc_cutoff "$MC_CUTOFF" --sig_mc_samples "$MC_SAMPLES" --sig_n_jobs "$PAR" \
     --outdir "$OUT"
@@ -51,6 +72,7 @@ for SIGMA in $SIGMA_LIST; do
       --owner      "$OUT/inputs/owner.txt" \
       --sigma      "$SIGMA" -M "$M" \
       --test both --null "$NULL" --theta "$THETA" --par "$PAR" \
+      ${MIN_MINE_ARG[@]+"${MIN_MINE_ARG[@]}"} \
       --mc_cutoff "$MC_CUTOFF" --mc_samples "$MC_SAMPLES" \
       --outdir "$WYOUT" \
       --pvalues_exp   "$PVAL_EXP" \

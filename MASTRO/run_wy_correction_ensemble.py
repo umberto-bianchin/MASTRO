@@ -304,7 +304,7 @@ def _run_resample(args):
         want_exp = test in ("exp", "both")
         want_theta = test in ("theta", "both")
         # Mine the null at the lower theta-candidate threshold when requested,
-        # so the null theta family is complete (Section 4.3); exp is recovered
+        # so the null theta family is complete; exp is recovered
         # afterwards by filtering the mined patterns to s_exp >= sigma. When
         # theta_cand_sigma is None (theta=1, exp-only, or infeasible) we mine at
         # sigma exactly, as before.
@@ -451,7 +451,9 @@ def main():
                          "theta family is mined at sigma instead (possibly "
                          "incomplete). Must match the value passed "
                          "to run_pipeline.py so observed and null families agree. "
-                         "Set e.g. 2 on breastCancer; leave unset on TRACERx.")
+                         "Set 2 on both cohorts: mining at support 1 enumerates "
+                         "every itemset carried by a single patient and does not "
+                         "terminate in practice.")
     ap.add_argument("--mc_cutoff", type=int, default=8,
                     help="M_i above which to use MC sampling (default: 8)")
     ap.add_argument("--mc_samples", type=int, default=10000,
@@ -516,7 +518,7 @@ def main():
     print(f"[WY] test={args.test} null={args.null} theta={args.theta}")
     print(f"[WY] parallel = {args.par}")
 
-    # Candidate mining threshold for the NULL theta family (Section 4.3):
+    # Candidate mining threshold for the NULL theta family:
     # sigma_exp = floor(theta*sigma). None keeps the old behaviour (mine at
     # sigma) for theta = 1, for the exp-only test, or when the required
     # threshold is below --min_mine_sigma, where mining is not tractable.

@@ -287,9 +287,11 @@ def main():
                     help="Lower bound on the candidate mining threshold for the "
                          "theta-consensus family. The correctness rule is "
                          "sigma_exp = floor(theta*sigma); when it falls "
-                         "below this bound the theta family is mined at sigma instead."
-                         "Set e.g. 2 on breastCancer to avoid the sigma=1 blow-up;"
-                        "leave unset on small cohorts such as TRACERx.")
+                         "below this bound the theta family is mined at sigma "
+                         "instead. Set 2 on both cohorts to avoid the sigma=1 "
+                         "blow-up; must match the value passed to "
+                         "run_wy_correction_ensemble.py so observed and null "
+                         "families agree.")
     ap.add_argument("--lcmdir", default="./lcm53", help="Path to lcm53 directory")
     ap.add_argument("--outdir", default=None, help="Output directory (default: results_<timestamp>)")
     ap.add_argument("--keep_gl", action="store_true", help="Keep GL in stats and transactions")
