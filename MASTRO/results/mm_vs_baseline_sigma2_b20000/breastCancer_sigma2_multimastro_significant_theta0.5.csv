@@ -1,0 +1,6 @@
+trajectory,pattern,n_genes,is_total_order,s_exp,n_patients,pval,wy_threshold,mined_by_multimastro,seeds_hit,seeds_hit_ids,mined_in_seeds,mined_in_seeds_ids
+CBFB < PIK3CA,CBFB->-PIK3CA,2,yes,32.500000,33,5.003879e-06,5.529073e-05,yes,10,0;1;2;3;4;5;6;7;8;9,10,0;1;2;3;4;5;6;7;8;9
+PIK3CA < SF3B1,PIK3CA->-SF3B1,2,yes,19.000000,19,2.452104e-05,5.529073e-05,yes,10,0;1;2;3;4;5;6;7;8;9,10,0;1;2;3;4;5;6;7;8;9
+CDH1 < PIK3CA,CDH1->-PIK3CA,2,yes,100.000000,101,4.999753e-05,5.529073e-05,yes,10,0;1;2;3;4;5;6;7;8;9,10,0;1;2;3;4;5;6;7;8;9
+TP53 < ARID2,TP53->-ARID2,2,yes,15.000000,15,5.427954e-05,5.529073e-05,yes,10,0;1;2;3;4;5;6;7;8;9,10,0;1;2;3;4;5;6;7;8;9
+TP53 < KMT2D,TP53->-KMT2D,2,yes,24.000000,24,5.477051e-05,5.529073e-05,yes,10,0;1;2;3;4;5;6;7;8;9,10,0;1;2;3;4;5;6;7;8;9
