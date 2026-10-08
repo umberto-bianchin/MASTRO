@@ -1,0 +1,74 @@
+{
+  "method": "pottr",
+  "label": "drop5",
+  "k": 5,
+  "n_dags": 1729,
+  "threads": 20,
+  "parallel": true,
+  "verbose": true,
+  "solution_pool": 0,
+  "stages": [
+    {
+      "stage": "read_dags",
+      "elapsed_s": 0.316,
+      "cpu_s": 1.081,
+      "cpu_per_wall": 3.41
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 26.45,
+      "cpu_s": 117.542,
+      "cpu_per_wall": 4.44
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 27.15,
+      "cpu_s": 27.194,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "ilp",
+      "elapsed_s": 1247.419,
+      "cpu_s": 4595.553,
+      "cpu_per_wall": 3.68
+    },
+    {
+      "stage": "dedup",
+      "elapsed_s": 0.0,
+      "cpu_s": 0.0,
+      "cpu_per_wall": null
+    },
+    {
+      "stage": "support",
+      "elapsed_s": 0.296,
+      "cpu_s": 0.296,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "convert",
+      "elapsed_s": 0.01,
+      "cpu_s": 0.01,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "significance_SKIPPED",
+      "elapsed_s": 0.0
+    }
+  ],
+  "total_s": 1303.896,
+  "cpu_total_s": 4743.931,
+  "cpu_per_wall": 3.64,
+  "peak_rss_mb": 8315.2,
+  "largest_trajectory_nodes": 4,
+  "status": "ok",
+  "completed": true,
+  "n_trajectories": 1,
+  "trajectories": [
+    {
+      "items": "CBFB->-MAP3K1 MAP3K1->-PIK3CA 0->-CBFB",
+      "support": 7,
+      "n_occurrences": 7,
+      "n_patients": 6
+    }
+  ]
+}

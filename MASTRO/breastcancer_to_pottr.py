@@ -25,7 +25,8 @@ patient. Two things break a naive run on breastCancer:
 To make the comparison meaningful and tractable, this script:
   * deduplicates identical trees within a patient (POTTR would count them
     separately (see point 2),
-  * caps the number of candidate trees per patient (``--max_trees``),
+  * caps the number of candidate trees per patient (``--max_trees``) or drops
+    the patients that exceed it (``--drop_above``),
   * optionally restricts to multi-tree patients (``--multitree_only``), the
     only regime where POTTR and the ensemble test can differ, and/or to a
     random subset of ``--n_patients`` patients, to keep the ILP tractable,
@@ -93,6 +94,12 @@ def main():
                          "dedup (default 5). Total trees drive POTTR's O(T^2) cost")
     ap.add_argument("--min_trees", type=int, default=1,
                     help="Keep only patients with >= this many DISTINCT trees")
+    ap.add_argument("--drop_above", type=int, default=0,
+                    help="Drop patients with MORE than this many distinct "
+                         "trees instead of truncating them (0 = keep all). "
+                         "Unlike --max_trees this removes the patient from "
+                         "the cohort, so no patient is reported on a subset "
+                         "of its own candidate trees")
     ap.add_argument("--multitree_only", action="store_true",
                     help="Keep only patients with >=2 distinct trees (the only "
                          "regime where POTTR and the ensemble test can differ)")
@@ -119,9 +126,18 @@ def main():
 
     # ---- select cohort ONCE: dedup -> cap -> eligibility -> subset ----------
     selected = []  # list of (orig_patient_idx, [trees])
+    n_dropped_above = 0
     for i, tlist in enumerate(data):
         trees = _dedup_trees(list(tlist), drop_gl)
         if len(trees) < min_trees:
+            continue
+        # Two different ways to keep the cohort small, and they answer two
+        # different objections. --max_trees truncates a patient, so the heavy
+        # patients stay in but are read on part of their trees only.
+        # --drop_above removes them outright, leaving every surviving patient
+        # with its complete set of candidate trees
+        if args.drop_above and len(trees) > args.drop_above:
+            n_dropped_above += 1
             continue
         if len(trees) > args.max_trees:
             trees = trees[:args.max_trees]  # deterministic: first distinct trees
@@ -157,6 +173,9 @@ def main():
 
     tc = np.array(tree_counts) if tree_counts else np.array([0])
     print(f"[bc->POTTR] patients selected = {len(selected)}, tree files = {n_files}")
+    if args.drop_above:
+        print(f"[bc->POTTR] dropped for > {args.drop_above} distinct trees: "
+              f"{n_dropped_above} patients")
     print(f"[bc->POTTR] distinct trees/patient: min={tc.min()} "
           f"median={int(np.median(tc))} max={tc.max()} "
           f"(multi-tree patients = {(tc > 1).sum()})")

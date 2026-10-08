@@ -1,0 +1,15 @@
+cohort,n_patients,n_trees,method,threads,param,value,total_s,cpu_total_s,cpu_per_wall,status,n_trajectories,pottr_support,pottr_patients,detail
+10,1315,2908,multi-mastro,1,sigma,2.0,66.776,66.746,1.0,ok,2414,,,transnum=0.084@0.72x;lcm=5.783@1.0x;convert=22.709@1.0x;filter=38.196@1.0x
+10,1315,2908,multi-mastro,1,sigma,5.0,0.153,0.15,0.98,ok,376,,,transnum=0.061@0.99x;lcm=0.009;convert=0.047@0.99x;filter=0.036@0.99x
+10,1315,2908,pottr,20,k,2,3360.667,10064.581,2.99,ok,1,6,2,read_dags=0.474@3.91x;conflict=68.192@5.77x;conflict=46.453@1.0x;ilp=3240.975@2.97x;dedup=0.0;support=0.693@1.0x;convert=0.004;significance_SKIPPED=0.0
+10,1315,2908,pottr,20,k,5,3347.099,8172.633,2.44,ok,1,6,6,read_dags=0.453@3.89x;conflict=70.398@5.88x;conflict=51.477@1.0x;ilp=3220.065@2.39x;dedup=0.0;support=0.674@1.0x;convert=0.004;significance_SKIPPED=0.0
+10,1315,2908,pottr,20,k,10,4396.157,12728.905,2.9,ok,1,82,29,read_dags=0.485@3.31x;conflict=81.191@5.15x;conflict=76.138@1.0x;ilp=4232.663@2.89x;dedup=0.0;support=0.619@1.0x;convert=0.007;significance_SKIPPED=0.0
+10,1315,2908,pottr,20,k,20,1995.688,5125.109,2.57,ok,1,58,27,read_dags=0.509@3.27x;conflict=75.518@5.47x;conflict=57.622@1.0x;ilp=1857.402@2.5x;dedup=0.0;support=0.537@1.0x;convert=0.004;significance_SKIPPED=0.0
+10,1315,2908,pottr,20,k,50,770.644,1610.422,2.09,ok,1,187,101,read_dags=0.45@3.74x;conflict=72.358@5.73x;conflict=47.75@1.0x;ilp=645.85@1.77x;dedup=0.0;support=0.528@1.0x;convert=0.004;significance_SKIPPED=0.0
+drop5,1188,1729,multi-mastro,1,sigma,2.0,0.356,0.351,0.99,ok,1823,,,transnum=0.032@0.98x;lcm=0.022@0.98x;convert=0.12@1.0x;filter=0.179@1.0x
+drop5,1188,1729,multi-mastro,1,sigma,5.0,0.115,0.113,0.98,ok,281,,,transnum=0.031@0.98x;lcm=0.005;convert=0.039@0.99x;filter=0.039@0.99x
+drop5,1188,1729,pottr,20,k,2,873.419,3663.201,4.19,ok,1,6,2,read_dags=0.291@3.45x;conflict=26.12@4.46x;conflict=27.294@1.0x;ilp=817.474@4.3x;dedup=0.0;support=0.323@1.0x;convert=0.007;significance_SKIPPED=0.0
+drop5,1188,1729,pottr,20,k,5,1303.896,4743.931,3.64,ok,1,7,6,read_dags=0.316@3.41x;conflict=26.45@4.44x;conflict=27.15@1.0x;ilp=1247.419@3.68x;dedup=0.0;support=0.296@1.0x;convert=0.01@1.0x;significance_SKIPPED=0.0
+drop5,1188,1729,pottr,20,k,10,525.427,1836.553,3.5,ok,1,24,11,read_dags=0.294@3.52x;conflict=23.356@4.89x;conflict=17.516@1.0x;ilp=481.896@3.53x;dedup=0.0;support=0.262@1.0x;convert=0.004;significance_SKIPPED=0.0
+drop5,1188,1729,pottr,20,k,20,264.166,549.331,2.08,ok,1,40,25,read_dags=0.265@3.65x;conflict=24.379@4.81x;conflict=17.31@1.0x;ilp=220.282@1.87x;dedup=0.0;support=0.273@1.0x;convert=0.004;significance_SKIPPED=0.0
+drop5,1188,1729,pottr,20,k,50,194.856,429.901,2.21,ok,1,112,70,read_dags=0.285@3.51x;conflict=25.526@4.55x;conflict=28.053@1.0x;ilp=138.918@2.03x;dedup=0.0;support=0.3@1.0x;convert=0.007;significance_SKIPPED=0.0

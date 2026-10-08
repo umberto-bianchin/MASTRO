@@ -88,15 +88,18 @@ echo "[info] POTTR repo: $POTTR_REPO"
 POTTR_ENV=${POTTR_ENV:-pottr_env}
 OUTDIR=${OUTDIR:-results/timing_pottr_vs_mastro}
 
-# Distinct trees per patient. 0 means no cap at all, i.e. the full 37809-tree
-# cohort, which is expected to time out on the POTTR side and is included
-# precisely to record that.
+# Cohorts to sweep. An entry is either
+#   <N>   cap: every patient keeps at most N distinct trees, heavy patients
+#         truncated, cohort labelled cap<N>. 0 means no cap at all, i.e. the
+#         full 37809-tree cohort
+#   d<N>  drop: patients with MORE than N distinct trees are removed from the
+#         cohort entirely, labelled drop<N>.
 CAP_LIST=${CAP_LIST:-"1 2 3 5 8 0"}
 # A cohort that already exists, instead of one built from breastCancer.npy.
 # Point it at a directory holding inputs/ (graphs_all.txt, owner.txt,
 # weights_uniform.txt) and dags/ (one file per tree, named <patient>-<tree>).
 # CAP_LIST is then ignored: there is one cohort and it is taken as given.
-# Both sides must describe the SAME trees; nothing here checks that for you.
+# Both sides must describe the SAME trees
 COHORT_DIR=${COHORT_DIR:-}
 COHORT_NAME=${COHORT_NAME:-prebuilt}
 
@@ -136,20 +139,13 @@ SEED=${SEED:-0}
 # the MASTRO side can be exercised on a machine without a Gurobi licence.
 SKIP_POTTR=${SKIP_POTTR:-0}
 SKIP_MASTRO=${SKIP_MASTRO:-0}
-# Abandon the k-sweep of a cohort after this many CONSECUTIVE timeouts. The
-# cost is dominated by the ILP, and how that scales with k is not known, so
-# one slow k is not evidence that the rest are slow. 0 disables the cutoff.
+# Abandon the k-sweep of a cohort after this many CONSECUTIVE timeouts
 MAX_CONSEC_TIMEOUTS=${MAX_CONSEC_TIMEOUTS:-3}
-# Thread settings to time POTTR at. The single-threaded arm is worth one
-# documented data point, but it did not finish even the easiest instance, so
-# it is not worth repeating across the sweep: POTTR_THREADS="$CORES".
+# Thread settings to time POTTR at
 POTTR_THREADS=${POTTR_THREADS:-"1 $CORES"}
 # Gurobi solution pool. run_POTTR defaults to 0, i.e. one optimal solution;
-# the POTTR paper used 50000 when comparing against MASTRO, to collect the
-# co-optimal trajectories. Timings at the two settings are not comparable.
 POOL=${POOL:-0}
-# Pass -v to POTTR so Gurobi prints its MIP log. Worth having when a run is
-# expected to time out: the log shows the gap it was still sitting at.
+# Pass -v to POTTR so Gurobi prints its MIP log
 POTTR_VERBOSE=${POTTR_VERBOSE:-1}
 
 mkdir -p "$OUTDIR"
@@ -189,7 +185,7 @@ fi
   if [ -n "$COHORT_DIR" ]; then
     echo "cohort        : $COHORT_NAME (prebuilt, $COHORT_DIR)"
   else
-    echo "cap list      : $CAP_LIST"
+    echo "cohort list   : $CAP_LIST"
   fi
   echo "k list        : $(echo $K_LIST | tr ' ' '\n' | head -1)..$(echo $K_LIST | tr ' ' '\n' | tail -1)"
   echo "sigma list    : $SIGMA_LIST"
@@ -201,13 +197,24 @@ for CAP in $CAP_LIST; do
   echo
   if [ -n "$COHORT_DIR" ]; then
     echo "############ cohort: ${COHORT_NAME} (prebuilt) ############"
+    COHORT_LABEL="${COHORT_NAME}"
     CDIR="${OUTDIR}/${COHORT_NAME}"
     ENS_DIR="$(cd "$COHORT_DIR/inputs" && pwd)"
     DAGS_DIR="$(cd "$COHORT_DIR/dags" && pwd)"
     mkdir -p "$CDIR"
   else
-    echo "############ cohort: max_trees=${CAP} ############"
-    CDIR="${OUTDIR}/cap${CAP}"
+    # d<N> selects the drop arm, a bare number the cap arm
+    case "$CAP" in
+      d*) DROP_ABOVE="${CAP#d}"; MT=1000000
+          COHORT_LABEL="drop${DROP_ABOVE}"
+          echo "############ cohort: drop patients with > ${DROP_ABOVE} trees ############" ;;
+      *)  DROP_ABOVE=0; MT="$CAP"
+          # max_trees 0 means "no cap"; the converter takes a large number
+          [ "$CAP" = "0" ] && MT=1000000
+          COHORT_LABEL="cap${CAP}"
+          echo "############ cohort: max_trees=${CAP} ############" ;;
+    esac
+    CDIR="${OUTDIR}/${COHORT_LABEL}"
     ENS_DIR="${CDIR}/inputs"
     DAGS_DIR="${CDIR}/dags"
     mkdir -p "$CDIR"
@@ -217,14 +224,13 @@ for CAP in $CAP_LIST; do
   if [ -n "$COHORT_DIR" ]; then
     echo "=== (A) using prebuilt cohort at $COHORT_DIR ==="
   elif [ -f "${ENS_DIR}/manifest.csv" ]; then
-    echo "[SKIP] cohort cap=${CAP} already built"
+    echo "[SKIP] cohort ${COHORT_LABEL} already built"
   else
-    echo "=== (A) build matched cohort, max_trees=${CAP} ==="
-    # max_trees 0 means "no cap"; the converter takes a large number instead.
-    MT=$CAP; [ "$CAP" = "0" ] && MT=1000000
+    echo "=== (A) build matched cohort: ${COHORT_LABEL} ==="
     "$PY" breastcancer_to_pottr.py \
       --npy "$NPY" --out "$DAGS_DIR" --ensemble_out "$ENS_DIR" \
-      --max_trees "$MT" --n_patients 0 --seed "$SEED"
+      --max_trees "$MT" --drop_above "$DROP_ABOVE" \
+      --n_patients 0 --seed "$SEED"
   fi
 
   if [ -f "${ENS_DIR}/manifest.csv" ]; then
@@ -247,7 +253,7 @@ for CAP in $CAP_LIST; do
       if timeout "$TIMEOUT" "$PY" mastro_timing_run.py \
            --inputs "$ENS_DIR" --sigma "$S" \
            --workdir "${CDIR}/mastro_work_s${S}" \
-           --label "cap${CAP}" --out "$J"; then
+           --label "${COHORT_LABEL}" --out "$J"; then
         :
       else
         echo "{\"method\":\"multi-mastro\",\"sigma\":${S},\"completed\":false,\"status\":\"timeout_or_error\",\"total_s\":${TIMEOUT}}" > "$J"
@@ -278,7 +284,7 @@ for CAP in $CAP_LIST; do
         if timeout "$TIMEOUT" "$PY" "${MASTRO_DIR}/pottr_timing_run.py" \
              --pottr_repo "$POTTR_REPO" --dags "$(cd "$DAGS_DIR" && pwd)" \
              -k "$K" -c "$TH" --pool "$POOL" $PFLAG $VFLAG \
-             --output_path "$KOUT" --label "cap${CAP}" --out "$J" 2>&1 | tee "$LOG"; then
+             --output_path "$KOUT" --label "${COHORT_LABEL}" --out "$J" 2>&1 | tee "$LOG"; then
           :
         else
           # pottr_timing_run.py writes a partial record on SIGTERM. Only fall
@@ -296,7 +302,7 @@ for CAP in $CAP_LIST; do
       else
         CONSEC=$((CONSEC + 1))
         if [ "$MAX_CONSEC_TIMEOUTS" != "0" ] && [ "$CONSEC" -ge "$MAX_CONSEC_TIMEOUTS" ]; then
-          echo "    [STOP] ${CONSEC} consecutive timeouts; abandoning the k-sweep (cap=${CAP}, threads=${TH})"
+          echo "    [STOP] ${CONSEC} consecutive timeouts; abandoning the k-sweep (${COHORT_LABEL}, threads=${TH})"
           for KR in $K_LIST; do
             [ "$KR" -le "$K" ] && continue
             [ -f "${CDIR}/pottr_t${TH}_k${KR}.json" ] && continue

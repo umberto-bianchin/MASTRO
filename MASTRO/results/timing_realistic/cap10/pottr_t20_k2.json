@@ -1,0 +1,74 @@
+{
+  "method": "pottr",
+  "label": "cap10",
+  "k": 2,
+  "n_dags": 2908,
+  "threads": 20,
+  "parallel": true,
+  "verbose": true,
+  "solution_pool": 0,
+  "stages": [
+    {
+      "stage": "read_dags",
+      "elapsed_s": 0.474,
+      "cpu_s": 1.854,
+      "cpu_per_wall": 3.91
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 68.192,
+      "cpu_s": 393.699,
+      "cpu_per_wall": 5.77
+    },
+    {
+      "stage": "conflict",
+      "elapsed_s": 46.453,
+      "cpu_s": 46.499,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "ilp",
+      "elapsed_s": 3240.975,
+      "cpu_s": 9617.955,
+      "cpu_per_wall": 2.97
+    },
+    {
+      "stage": "dedup",
+      "elapsed_s": 0.0,
+      "cpu_s": 0.0,
+      "cpu_per_wall": null
+    },
+    {
+      "stage": "support",
+      "elapsed_s": 0.693,
+      "cpu_s": 0.693,
+      "cpu_per_wall": 1.0
+    },
+    {
+      "stage": "convert",
+      "elapsed_s": 0.004,
+      "cpu_s": 0.004,
+      "cpu_per_wall": null
+    },
+    {
+      "stage": "significance_SKIPPED",
+      "elapsed_s": 0.0
+    }
+  ],
+  "total_s": 3360.667,
+  "cpu_total_s": 10064.581,
+  "cpu_per_wall": 2.99,
+  "peak_rss_mb": 21412.5,
+  "largest_trajectory_nodes": 7,
+  "status": "ok",
+  "completed": true,
+  "n_trajectories": 1,
+  "trajectories": [
+    {
+      "items": "0->-PIK3CA TP53->-APC CARD11->-ATR PIK3CA->-TP53 APC->-MGA MGA->-CARD11",
+      "support": 6,
+      "n_occurrences": 6,
+      "n_patients": 2
+    }
+  ]
+}
