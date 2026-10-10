@@ -1,0 +1,2 @@
+pattern,n_nodes,n_edges,s_exp,s_theta,pval_exp,pval_theta
+A->-C B->-C,3,2,15.000000,15,1.053859e-07,1.053859e-07

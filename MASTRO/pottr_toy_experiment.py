@@ -127,13 +127,14 @@ def build_cohort(root, trees, n_trees):
     return dags, ens
 
 
-def run_pottr(pottr_python, pottr_code, dags, out_k, k):
+def run_pottr(pottr_python, pottr_code, dags, out_k, k, extra=()):
+    """Run POTTR at one k; *extra* holds further run_POTTR.py flags (-rf, -rt N)."""
     out_k.mkdir(parents=True, exist_ok=True)
     log = out_k / "pottr.log"
     with log.open("w") as fl:
         subprocess.run([str(pottr_python), "run_POTTR.py",
                         "-o", str(out_k.resolve()), "-d", str(dags.resolve()),
-                        "-k", str(k), "-c", "1"],
+                        "-k", str(k), "-c", "1", *extra],
                        cwd=pottr_code, stdout=fl, stderr=subprocess.STDOUT,
                        check=True)
 
