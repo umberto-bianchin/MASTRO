@@ -1,0 +1,2 @@
+seed,n_traj,pottr_n_pval,pottr_min_p,pottr_n_below_0.05,pottr_n_below_0.01,pottr_n_below_0.001,mm_exp_n_pval,mm_exp_min_p,mm_exp_n_below_0.05,mm_exp_n_below_0.01,mm_exp_n_below_0.001,mm_theta_n_pval,mm_theta_min_p,mm_theta_n_below_0.05,mm_theta_n_below_0.01,mm_theta_n_below_0.001
+1,8,8,5.787037037037039e-07,4,2,1,8,0.0005622189,4,1,1,8,0.0005622189,3,1,1
