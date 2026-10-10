@@ -51,39 +51,24 @@
 # =============================================================================
 set -euo pipefail
 
-# Locate the code directory rather than assuming a layout: scripts/ sits
-# beside MASTRO/ on the server but inside it in the local checkout, so a fixed
-# relative path works in one place and silently breaks in the other.
+# Every path below is relative to the code directory (<repo>/MASTRO), which
+# holds this scripts/ folder. COHORT_DIR is still resolved against the
+# directory the script was invoked from, so remember it before moving.
 INVOKED_FROM="$(pwd)"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-MASTRO_DIR=""
-for CAND in "${SCRIPT_DIR}/../MASTRO" "${SCRIPT_DIR}/.." "${SCRIPT_DIR}/../.."; do
-  if [ -f "${CAND}/mastro_timing_run.py" ] && [ -x "${CAND}/lcm53/lcm" ]; then
-    MASTRO_DIR="$(cd "$CAND" && pwd)"; break
-  fi
-done
-[ -n "$MASTRO_DIR" ] || {
-  echo "[err] cannot find the code directory (needs mastro_timing_run.py and lcm53/lcm)."
-  echo "      Looked beside and above $SCRIPT_DIR."
-  exit 1
-}
-cd "$MASTRO_DIR"
-echo "[info] code dir: $MASTRO_DIR"
+cd "$(dirname "$0")/.."
+MASTRO_DIR="$(pwd)"
+[ -x lcm53/lcm ] || ( echo "building LCM"; cd lcm53 && make )
 
 # ---- knobs ------------------------------------------------------------------
 NPY=${NPY:-../data/breastCancer.npy}
 # Interpreter for every Python stage. Override when the PATH python3 is
 # not the one carrying numpy / the POTTR deps.
 PY=${PY:-python3}
-# POTTR lives beside the repo in some checkouts and one level up in others,
-# so probe instead of defaulting. POTTR_REPO=<path> overrides the search.
-if [ -z "${POTTR_REPO:-}" ]; then
-  for CAND in ../POTTR ../../POTTR ../../../POTTR; do
-    [ -f "${CAND}/code/run_POTTR.py" ] && { POTTR_REPO="$(cd "$CAND" && pwd)"; break; }
-  done
-fi
-[ -n "${POTTR_REPO:-}" ] || {
-  echo "[err] POTTR repo not found. Pass POTTR_REPO=/path/to/POTTR."; exit 1; }
+# POTTR is cloned next to this repository: <parent>/MASTRO and <parent>/POTTR
+POTTR_REPO=${POTTR_REPO:-../../POTTR}
+[ -f "${POTTR_REPO}/code/run_POTTR.py" ] || {
+  echo "[err] no POTTR clone at ${POTTR_REPO} (clone it next to the repo, or set POTTR_REPO)."; exit 1; }
+POTTR_REPO="$(cd "$POTTR_REPO" && pwd)"
 echo "[info] POTTR repo: $POTTR_REPO"
 POTTR_ENV=${POTTR_ENV:-pottr_env}
 OUTDIR=${OUTDIR:-results/timing_pottr_vs_mastro}

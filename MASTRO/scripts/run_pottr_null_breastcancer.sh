@@ -21,11 +21,11 @@
 # Run from the repo's MASTRO/ directory:  bash scripts/run_pottr_null_breastcancer.sh
 # =============================================================================
 set -euo pipefail
-cd "$(dirname "$0")/../MASTRO"               # -> MASTRO/ (Python CWD for our tools)
+cd "$(dirname "$0")/.."                     # -> <repo>/MASTRO, the code directory
 
 # ---- knobs ------------------------------------------------------------------
 NPY=${NPY:-../data/breastCancer.npy}
-POTTR_REPO=${POTTR_REPO:-../POTTR}           # repo root that holds code/
+POTTR_REPO=${POTTR_REPO:-../../POTTR}        # POTTR clone next to this repo (holds code/)
 POTTR_ENV=${POTTR_ENV:-pottr_env}            # conda env with gurobi (environment.yaml)
 OUT_BASE=${OUT_BASE:-results/pottr_null}
 MAX_TREES=${MAX_TREES:-2}                    # same cohort as the real-data run

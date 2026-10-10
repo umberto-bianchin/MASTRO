@@ -21,14 +21,14 @@
 # Run from the repo's MASTRO/ directory:  bash scripts/run_pottr_breastcancer.sh
 # =============================================================================
 set -euo pipefail
-cd "$(dirname "$0")/../MASTRO"               # -> MASTRO/ (Python CWD for our tools)
+cd "$(dirname "$0")/.."                     # -> <repo>/MASTRO, the code directory
 MASTRO_DIR="$(pwd)"
 
 # ---- knobs ------------------------------------------------------------------
 NPY=${NPY:-../data/breastCancer.npy}
-POTTR_REPO=${POTTR_REPO:-../POTTR}           # repo root that holds code/ (+ data/)
+POTTR_REPO=${POTTR_REPO:-../../POTTR}        # POTTR clone next to this repo (holds code/)
 POTTR_ENV=${POTTR_ENV:-pottr_env}            # conda env with gurobi (environment.yaml)
-DAGS_DIR=${DAGS_DIR:-${POTTR_REPO}/data/breastcancer_dags}
+DAGS_DIR=${DAGS_DIR:-results/pottr_cmp/dags}            # POTTR input, one file per tree
 POTTR_OUT=${POTTR_OUT:-results/pottr_cmp/pottr_bc}      # <- k<k>/ subdirs written here
 ENS_DIR=${ENS_DIR:-results/pottr_cmp/bc_inputs}         # matched ensemble inputs
 SIG_OUT=${SIG_OUT:-results/pottr_cmp/pottr_bc_significance.csv}

@@ -14,18 +14,9 @@
 # Independent of the other experiment scripts, safe to run in parallel.
 # =============================================================================
 set -euo pipefail
-# Locate the directory that holds run_pipeline.py, robustly to both layouts:
-# scripts/ inside the package (cd ..) or scripts/ as a sibling of MASTRO/
-# (cd ../MASTRO, e.g. the server 'code/' bundle).
-SDIR="$(cd "$(dirname "$0")" && pwd)"
-if [ -f "$SDIR/../run_pipeline.py" ]; then
-  cd "$SDIR/.."
-elif [ -f "$SDIR/../MASTRO/run_pipeline.py" ]; then
-  cd "$SDIR/../MASTRO"
-else
-  echo "ERROR: cannot locate run_pipeline.py from $SDIR" >&2
-  exit 1
-fi
+# Every path below is relative to the code directory (<repo>/MASTRO), which
+# holds this scripts/ folder; the datasets are in <repo>/data (../data).
+cd "$(dirname "$0")/.."
 
 M=${M:-2000}
 PAR=${PAR:-4}

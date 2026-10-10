@@ -22,6 +22,14 @@ default is deliberately small so that several experiments can run side by side.
 Memory per worker is modest, since the per-patient tensors are shared
 copy-on-write rather than copied.
 
+**Paths follow the repository.** Every script moves to the code directory
+(`<repo>/MASTRO`, the parent of `scripts/`) before doing anything, so it can be
+launched from anywhere, e.g. `bash MASTRO/scripts/run_exp_power.sh` from the
+repository root. Datasets are read from `<repo>/data` and results written to
+`<repo>/MASTRO/results`. The POTTR experiments expect a clone of
+[POTTR](https://github.com/AlBi-HHU/POTTR) next to the repository, i.e.
+`<parent>/MASTRO` and `<parent>/POTTR`; `POTTR_REPO` overrides that location.
+
 **`lcm53/lcm` is built on first use**, so a fresh checkout needs no setup step
 beyond the Python dependencies.
 
@@ -158,14 +166,57 @@ with one row per trajectory (its support in trees, its support in distinct
 patients, its expected support, the multi-tree p-values and POTTR's own), and
 the comparison figure.
 
-Requires a POTTR checkout and a Gurobi licence. Point `POTTR_REPO` at the
-checkout; set `POTTR_ENV` to a conda environment providing Gurobi, or to the
-empty string to use the current interpreter. Expect the ILP to dominate the
+Requires the POTTR clone next to the repository and a Gurobi licence. Set
+`POTTR_ENV` to a conda environment providing Gurobi, or to the empty string to
+use the current interpreter. Expect the ILP to dominate the
 runtime.
 
 Knobs: `MAX_TREES` (trees per patient after deduplication), `K_MIN`/`K_MAX`,
 `N_PATIENTS`, `MULTITREE_ONLY`, `CORES`, `THETA`, `FORCE_POTTR_SIG`,
 `POTTR_SIG_MAX_NODES`, `SEED`.
+
+### POTTR on null cohorts
+
+`run_pottr_null_breastcancer.sh`
+
+Asks whether POTTR reports significant trajectories on a cohort where nothing
+is conserved. The matched breast-cancer cohort of the comparison above is built
+once, then turned into null cohorts by `permute_pottr_cohort.py`: every patient
+gets one random bijection of its own alterations, drawn independently across
+patients and applied to all of its candidate trees. Patients, trees, topologies
+and the agreement between a patient's trees survive; recurrence across patients
+does not. On each null cohort the driver runs the same stages as the comparison
+(POTTR k-sweep, POTTR's own p-values, multi-tree p-values of the same
+trajectories), and `summarize_pottr_null.py` counts, per seed, the trajectories
+below alpha for each test.
+
+Both tests score the same trajectories, so the comparison isolates the test
+from the miner. Neither is a calibrated multiple-testing procedure here: the
+ILP selects the most frequent trajectory, and an uncorrected p-value of a
+selected pattern is optimistic under any test. The calibrated reference for
+Multi-MASTRO is the calibration experiment.
+
+Writes `results/pottr_null/`: `real/` (the matched cohort), `seed<S>/` (null
+cohort, POTTR output, `significance.csv`) and `summary.csv`. Each seed costs as
+much as the real-data comparison; start with `SEEDS=1` to measure the time per
+k.
+
+Knobs: `SEEDS`, `K_LIST` (or `K_MIN`/`K_MAX`), `MAX_TREES`, `CORES`, `THETA`,
+`NULL`, `POTTR_SIG_MAX_NODES`.
+
+### Controlled POTTR examples
+
+Not drivers but single Python scripts, each running POTTR and the multi-tree
+test on a small hand-built cohort in seconds (run from `MASTRO/`, passing the
+POTTR environment's interpreter as `--pottr_python`):
+
+| Script | What it shows |
+|---|---|
+| `pottr_toy_experiment.py` | POTTR's test counts trees, not patients: identical copies of a patient's tree shrink its p-value (`--design ab_ba`, `perm`), and `--design all_orders` |
+| `pottr_power_toy.py` | the same error costs power when a patient's trees disagree ({A->B, B->A}) |
+| `pottr_cluster_resolution_toy.py` | two trees with A->B impose that order on every tree holding A and B in one cluster, and POTTR's p-value follows |
+
+All write under `results/pottr_toy/`.
 
 ### Runtime comparison against POTTR
 
@@ -345,7 +396,7 @@ D=results/<outdir>/cap2
 
 python3 pottr_force_significance.py \
   --pottr_dir $D/pottr_t20 --k_range 20,50 \
-  --dags $D/dags --pottr_repo ../POTTR \
+  --dags $D/dags --pottr_repo ../../POTTR \
   --max_nodes 6 --cores 20 --out $D/significance_forced.txt
 
 python3 pottr_significance.py \

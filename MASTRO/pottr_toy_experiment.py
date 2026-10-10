@@ -57,11 +57,7 @@ from utils import SCRIPT_DIR
 
 
 def default_pottr_code():
-    """POTTR's code/ dir: local layout (../../POTTR/code) or server (../POTTR/code)."""
-    for cand in (SCRIPT_DIR.parent.parent / "POTTR" / "code",
-                 SCRIPT_DIR.parent / "POTTR" / "code"):
-        if (cand / "run_POTTR.py").exists():
-            return cand
+    """POTTR's code/ dir in the clone next to this repo: <parent>/POTTR/code."""
     return SCRIPT_DIR.parent.parent / "POTTR" / "code"
 
 

@@ -31,7 +31,7 @@ Usage:
     python3 pottr_force_significance.py \\
         --pottr_dir results/pottr_cmp/pottr_bc --k_range 2,50 \\
         --dags ../POTTR/data/breastcancer_dags \\
-        --pottr_repo ../POTTR --max_nodes 6 --cores 20
+        --pottr_repo ../../POTTR --max_nodes 6 --cores 20
 """
 
 import argparse
@@ -72,7 +72,7 @@ def main():
     ap.add_argument("--pottr_dir", required=True, help="dir with k<k>/ subdirs")
     ap.add_argument("--k_range", default="2,50", help="min,max k (inclusive)")
     ap.add_argument("--dags", required=True, help="POTTR dags dir (same one POTTR ran on)")
-    ap.add_argument("--pottr_repo", default="../POTTR", help="POTTR repo root (holds code/)")
+    ap.add_argument("--pottr_repo", default="../../POTTR", help="POTTR repo root (holds code/)")
     ap.add_argument("--max_nodes", type=int, default=6,
                     help="skip trajectories with more non-root nodes; cost blows "
                          "up fast in n (n! automorphisms, and C(tree_nodes, n) "

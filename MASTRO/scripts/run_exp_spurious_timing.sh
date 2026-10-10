@@ -21,18 +21,9 @@
 # any number taken from this script.
 # =============================================================================
 set -euo pipefail
-# Locate the directory that holds analyze_spurious_itemsets.py, robustly to
-# both layouts: scripts/ inside the package (cd ..) or scripts/ as a sibling
-# of MASTRO/ (cd ../MASTRO, e.g. the server 'code/' bundle).
-SDIR="$(cd "$(dirname "$0")" && pwd)"
-if [ -f "$SDIR/../analyze_spurious_itemsets.py" ]; then
-  cd "$SDIR/.."
-elif [ -f "$SDIR/../MASTRO/analyze_spurious_itemsets.py" ]; then
-  cd "$SDIR/../MASTRO"
-else
-  echo "ERROR: cannot locate analyze_spurious_itemsets.py from $SDIR" >&2
-  exit 1
-fi
+# Every path below is relative to the code directory (<repo>/MASTRO), which
+# holds this scripts/ folder; the datasets are in <repo>/data (../data).
+cd "$(dirname "$0")/.."
 
 # All sigmas of the figure, 5e6 itemset cap, 180 s timeout per LCM
 # invocation, weighted mode, seed 0.
