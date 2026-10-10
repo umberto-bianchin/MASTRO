@@ -14,6 +14,13 @@ selected pattern is optimistic under any test. The calibrated reference for
 Multi-MASTRO is its full pipeline with the Westfall-Young threshold, which the
 calibration experiment (empirical_fwer_ensemble.py) measures.
 
+With --wy_name, the WY thresholds of each null cohort
+(<seed dir>/<wy_name>/wy_thresholds.txt, from scripts/run_pottr_null_wy.sh)
+are read as well and the Multi-MASTRO trajectories below them are counted:
+these are the corrected false discoveries. The expected-support threshold
+covers every trajectory with expected support >= sigma; the theta threshold
+covers the theta-maximal family only and is reported for reference.
+
 Output: one row per seed, then the fraction of seeds with at least one
 discovery at each alpha (a FWER-like rate) for each test.
 
@@ -39,11 +46,24 @@ def as_float(x):
         return None
 
 
+def read_wy(path):
+    """{alpha: (threshold_exp, threshold_theta)} from a wy_thresholds.txt."""
+    out = {}
+    for line in path.read_text().splitlines():
+        kv = dict(tok.split("=") for tok in line.split())
+        out[float(kv["alpha"])] = (float(kv["threshold_exp"]),
+                                   float(kv["threshold_theta"]))
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--csv", nargs="+", required=True,
                     help="pottr_significance.py tables, one per null seed")
+    ap.add_argument("--wy_name", default=None,
+                    help="WY output folder inside each seed dir "
+                         "(e.g. wy_sigma2_theta1.0); adds the corrected counts")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -59,12 +79,24 @@ def main():
             r[f"{test}_min_p"] = min(pv) if pv else ""
             for a in ALPHAS:
                 r[f"{test}_n_below_{a}"] = sum(p <= a for p in pv)
+        if args.wy_name:
+            wy_path = Path(path).parent / args.wy_name / "wy_thresholds.txt"
+            wy = read_wy(wy_path) if wy_path.exists() else {}
+            for a in ALPHAS:
+                if a not in wy:
+                    continue
+                for test, thr in zip(("mm_exp", "mm_theta"), wy[a]):
+                    pv = [p for p in (as_float(t[TESTS[test]]) for t in table)
+                          if p is not None]
+                    r[f"{test}_wy_threshold_{a}"] = thr
+                    r[f"{test}_n_wy_{a}"] = sum(p <= thr for p in pv)
         rows.append(r)
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        fields = list(dict.fromkeys(k for r in rows for k in r))
+        w = csv.DictWriter(f, fieldnames=fields, restval="")
         w.writeheader()
         w.writerows(rows)
 
@@ -76,6 +108,16 @@ def main():
             n = sum(r[f"{test}_n_below_{a}"] for r in rows)
             parts.append(f"{test}: {hit}/{len(rows)} cohorts ({n} trajectories)")
         print(f"  alpha={a:<6} " + " | ".join(parts))
+    for a in ALPHAS:
+        parts = []
+        for test in ("mm_exp", "mm_theta"):
+            have = [r for r in rows if f"{test}_n_wy_{a}" in r]
+            if have:
+                hit = sum(r[f"{test}_n_wy_{a}"] > 0 for r in have)
+                n = sum(r[f"{test}_n_wy_{a}"] for r in have)
+                parts.append(f"{test}: {hit}/{len(have)} cohorts ({n} trajectories)")
+        if parts:
+            print(f"  WY alpha={a:<6} " + " | ".join(parts))
 
 
 if __name__ == "__main__":

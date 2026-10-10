@@ -204,6 +204,18 @@ k.
 Knobs: `SEEDS`, `K_LIST` (or `K_MIN`/`K_MAX`), `MAX_TREES`, `CORES`, `THETA`,
 `NULL`, `POTTR_SIG_MAX_NODES`.
 
+`run_pottr_null_wy.sh`
+
+Adds the corrected side. On each null cohort already processed by the driver
+above it runs `run_wy_correction_ensemble.py` (same `perm` null, `SIGMA=2` so
+that every POTTR trajectory belongs to the expected-support family), writes
+`seed<S>/wy_sigma<SIGMA>_theta<THETA>/`, and reruns `summarize_pottr_null.py
+--wy_name` to count the Multi-MASTRO trajectories below the WY thresholds.
+The discovery-experiment thresholds cannot be reused: that cohort holds every
+candidate tree, this one at most `MAX_TREES` per patient.
+
+Knobs: `SEEDS` (default 1), `SIGMA`, `THETA`, `M`, `PAR`, `NULL`.
+
 ### Controlled POTTR examples
 
 Not drivers but single Python scripts, each running POTTR and the multi-tree
