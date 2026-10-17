@@ -15,12 +15,12 @@ import matplotlib.pyplot as plt
 
 FLOOR = 1e-300
 STYLE = {
-    "maestri": ("Multi-MASTRO", "C3", "o", "-"),
-    "perm_tree": ("perm. per tree", "C0", "s", "-"),
-    "count_trees": ("count trees", "C2", "^", "-"),
-    "count_perm_tree": ("count trees + perm. per tree", "C1", "v", "--"),
-    "trees_as_patients": ("trees as patients", "C4", "x", ":"),
-    "strict": ("no resolution (Multi-MASTRO)", "C3", "o", "-"),
+    "maestri": ("MAESTRI", "C3", "o", "-"),
+    "perm_tree": ("per-tree null", "C0", "s", "-"),
+    "count_trees": ("tree counts", "C2", "^", "-"),
+    "count_perm_tree": ("tree counts + per-tree null", "C1", "v", "--"),
+    "trees_as_patients": ("pooled trees", "C4", "x", ":"),
+    "strict": ("no resolution (MAESTRI)", "C3", "o", "-"),
     "lenient": ("same node = both orders", "C0", "s", "-"),
     "majority": ("same node = majority order", "C1", "v", "-"),
 }
@@ -64,7 +64,8 @@ def main():
     ap.add_argument("--dir", default="results/ablation_toys")
     args = ap.parse_args()
     d = Path(args.dir)
-    allv = ["maestri", "perm_tree", "count_trees", "count_perm_tree", "trees_as_patients"]
+    # count_perm_tree has the expected-support law of trees_as_patients: not drawn
+    allv = ["maestri", "perm_tree", "count_trees", "trees_as_patients"]
 
     fig, axes = plt.subplots(2, 3, figsize=(13, 7.5))
 
@@ -74,7 +75,7 @@ def main():
 
     rows = load(d / "competition.csv")
     draw(axes[0, 1], rows, allv, "B->-A", "pval_exp", suffix=": B->A")
-    draw(axes[0, 1], rows, ["maestri", "count_trees", "count_perm_tree"], "A->-B",
+    draw(axes[0, 1], rows, ["maestri", "count_trees", "trees_as_patients"], "A->-B",
          "pval_exp", suffix=": A->B", ls=":")
     finish(axes[0, 1], "Competition: 1 patient M x A->B, 100 patients B->A",
            "trees M of the A->B patient")

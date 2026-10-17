@@ -29,11 +29,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 STYLE = {
-    "maestri": ("Multi-MASTRO", "C3"),
-    "perm_tree": ("perm. per tree", "C0"),
-    "count_trees": ("count trees", "C2"),
-    "count_perm_tree": ("count trees + perm. per tree", "C1"),
-    "trees_as_patients": ("trees as patients", "C4"),
+    "maestri": ("MAESTRI", "C3"),
+    "perm_tree": ("per-tree null", "C0"),
+    "count_trees": ("tree counts", "C2"),
+    "count_perm_tree": ("tree counts + per-tree null", "C1"),
+    "trees_as_patients": ("pooled trees", "C4"),
 }
 DEFAULT_VARIANTS = "maestri,count_trees,perm_tree,trees_as_patients"
 FLOOR = 1e-300
@@ -76,7 +76,8 @@ def main():
                     help="count_perm_tree is left out by default: its "
                          "expected-support law equals trees_as_patients")
     ap.add_argument("--ymax", type=float, default=None)
-    ap.add_argument("--title", default=None)
+    ap.add_argument("--title", default=None,
+                    help="In-figure title (default: none, the caption carries it)")
     args = ap.parse_args()
     d = Path(args.dir)
     sub = "pvals_fixed" if args.family == "fixed" else "pvals"
@@ -147,7 +148,8 @@ def main():
     ax.set_xlim(0, top * 1.03)
     ax.set_xlabel(r"expected $-\log_{10} p$", fontsize=8)
     ax.set_ylabel(r"observed $-\log_{10} p$", fontsize=8)
-    ax.set_title(args.title or f"{d.name}: {n} null p-values per variant", fontsize=9)
+    if args.title:
+        ax.set_title(args.title, fontsize=9)
     ax.tick_params(labelsize=7)
     ax.legend(fontsize=6, markerscale=3, loc="lower right", frameon=True, framealpha=0.9)
     fig.tight_layout()
