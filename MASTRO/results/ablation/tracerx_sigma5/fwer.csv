@@ -1,0 +1,16 @@
+variant,alpha,wy_pool,threshold,fwer,fwer_se,n_family_real,n_discoveries
+maestri,0.01,perm_cal,4.015216e-04,0.0200,0.0063,64,2
+maestri,0.05,perm_cal,1.058596e-03,0.0740,0.0117,64,2
+maestri,0.1,perm_cal,1.736111e-03,0.1300,0.0150,64,4
+perm_tree,0.01,tree_cal,1.132912e-04,0.1560,0.0162,64,3
+perm_tree,0.05,tree_cal,6.701060e-04,0.3060,0.0206,64,4
+perm_tree,0.1,tree_cal,1.343366e-03,0.4000,0.0219,64,6
+count_trees,0.01,perm_cal,3.641768e-04,0.0180,0.0059,64,2
+count_trees,0.05,perm_cal,9.666314e-04,0.0600,0.0106,64,2
+count_trees,0.1,perm_cal,1.839827e-03,0.1420,0.0156,64,4
+count_perm_tree,0.01,tree_cal,2.060039e-04,0.7240,0.0200,64,5
+count_perm_tree,0.05,tree_cal,1.048508e-03,0.8020,0.0178,64,7
+count_perm_tree,0.1,tree_cal,2.066500e-03,0.8340,0.0166,64,8
+trees_as_patients,0.01,tree_cal,2.060039e-04,0.7240,0.0200,64,5
+trees_as_patients,0.05,tree_cal,1.048508e-03,0.8020,0.0178,64,7
+trees_as_patients,0.1,tree_cal,2.066500e-03,0.8340,0.0166,64,8
