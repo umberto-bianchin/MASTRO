@@ -62,7 +62,7 @@ def main():
     ap.add_argument("--owner", required=True)
     ap.add_argument("--sigma", type=float, required=True)
     ap.add_argument("--theta", type=float, default=1.0)
-    ap.add_argument("--null", choices=["perm", "indep"], default="perm")
+    ap.add_argument("--null", choices=["perm", "indep", "perm_tree"], default="perm")
     ap.add_argument("--test", choices=["exp", "theta", "both"], default="both")
     ap.add_argument("--n_datasets", type=int, default=200,
                     help="Size N of the null-dataset pool")

@@ -1,0 +1,71 @@
+toy,x,variant,pattern,theta,s_exp,s_theta,pval_exp,pval_theta
+ambiguity_AB,1,maestri,A->-B,0.5,0.5,1,1.0,1.0
+ambiguity_AB,1,perm_tree,A->-B,0.5,0.5,1,0.75,0.75
+ambiguity_AB,1,count_trees,A->-B,,1.0,,1.0,
+ambiguity_AB,1,count_perm_tree,A->-B,,1.0,,0.75,
+ambiguity_AB,1,trees_as_patients,A->-B,,1.0,,0.75,
+ambiguity_AB,2,maestri,A->-B,0.5,1.0,2,1.0,1.0
+ambiguity_AB,2,perm_tree,A->-B,0.5,1.0,2,0.6875,0.5625
+ambiguity_AB,2,count_trees,A->-B,,2.0,,1.0,
+ambiguity_AB,2,count_perm_tree,A->-B,,2.0,,0.6875,
+ambiguity_AB,2,trees_as_patients,A->-B,,2.0,,0.6875,
+ambiguity_AB,5,maestri,A->-B,0.5,2.5,5,1.0,1.0
+ambiguity_AB,5,perm_tree,A->-B,0.5,2.5,5,0.6230469,0.2373047
+ambiguity_AB,5,count_trees,A->-B,,5.0,,1.0,
+ambiguity_AB,5,count_perm_tree,A->-B,,5.0,,0.6230469,
+ambiguity_AB,5,trees_as_patients,A->-B,,5.0,,0.6230469,
+ambiguity_AB,10,maestri,A->-B,0.5,5.0,10,1.0,1.0
+ambiguity_AB,10,perm_tree,A->-B,0.5,5.0,10,0.5880985,0.05631351
+ambiguity_AB,10,count_trees,A->-B,,10.0,,1.0,
+ambiguity_AB,10,count_perm_tree,A->-B,,10.0,,0.5880985,
+ambiguity_AB,10,trees_as_patients,A->-B,,10.0,,0.5880985,
+ambiguity_AB,20,maestri,A->-B,0.5,10.0,20,1.0,1.0
+ambiguity_AB,20,perm_tree,A->-B,0.5,10.0,20,0.5626853,0.003171212
+ambiguity_AB,20,count_trees,A->-B,,20.0,,1.0,
+ambiguity_AB,20,count_perm_tree,A->-B,,20.0,,0.5626853,
+ambiguity_AB,20,trees_as_patients,A->-B,,20.0,,0.5626853,
+ambiguity_AB,50,maestri,A->-B,0.5,25.0,50,1.0,1.0
+ambiguity_AB,50,perm_tree,A->-B,0.5,25.0,50,0.5397946,5.663217e-07
+ambiguity_AB,50,count_trees,A->-B,,50.0,,1.0,
+ambiguity_AB,50,count_perm_tree,A->-B,,50.0,,0.5397946,
+ambiguity_AB,50,trees_as_patients,A->-B,,50.0,,0.5397946,
+ambiguity_AB,100,maestri,A->-B,0.5,50.0,100,1.0,1.0
+ambiguity_AB,100,perm_tree,A->-B,0.5,50.0,100,0.5281742,3.207202e-13
+ambiguity_AB,100,count_trees,A->-B,,100.0,,1.0,
+ambiguity_AB,100,count_perm_tree,A->-B,,100.0,,0.5281742,
+ambiguity_AB,100,trees_as_patients,A->-B,,100.0,,0.5281742,
+ambiguity_ABC,1,maestri,A->-B A->-C B->-C,0.16666666666666666,0.166667,1,1.0,1.0
+ambiguity_ABC,1,perm_tree,A->-B A->-C B->-C,0.16666666666666666,0.166667,1,0.665102,0.665102
+ambiguity_ABC,1,count_trees,A->-B A->-C B->-C,,1.0,,1.0,
+ambiguity_ABC,1,count_perm_tree,A->-B A->-C B->-C,,1.0,,0.665102,
+ambiguity_ABC,1,trees_as_patients,A->-B A->-C B->-C,,1.0,,0.665102,
+ambiguity_ABC,2,maestri,A->-B A->-C B->-C,0.16666666666666666,0.333333,2,1.0,1.0
+ambiguity_ABC,2,perm_tree,A->-B A->-C B->-C,0.16666666666666666,0.333333,2,0.6186674,0.4423607
+ambiguity_ABC,2,count_trees,A->-B A->-C B->-C,,2.0,,1.0,
+ambiguity_ABC,2,count_perm_tree,A->-B A->-C B->-C,,2.0,,0.6186674,
+ambiguity_ABC,2,trees_as_patients,A->-B A->-C B->-C,,2.0,,0.6186674,
+ambiguity_ABC,5,maestri,A->-B A->-C B->-C,0.16666666666666666,0.833333,5,1.0,1.0
+ambiguity_ABC,5,perm_tree,A->-B A->-C B->-C,0.16666666666666666,0.833333,5,0.5756611,0.1301492
+ambiguity_ABC,5,count_trees,A->-B A->-C B->-C,,5.0,,1.0,
+ambiguity_ABC,5,count_perm_tree,A->-B A->-C B->-C,,5.0,,0.5756611,
+ambiguity_ABC,5,trees_as_patients,A->-B A->-C B->-C,,5.0,,0.5756611,
+ambiguity_ABC,10,maestri,A->-B A->-C B->-C,0.16666666666666666,1.666667,10,1.0,1.0
+ambiguity_ABC,10,perm_tree,A->-B A->-C B->-C,0.16666666666666666,1.666667,10,0.5536266,0.0169388
+ambiguity_ABC,10,count_trees,A->-B A->-C B->-C,,10.0,,1.0,
+ambiguity_ABC,10,count_perm_tree,A->-B A->-C B->-C,,10.0,,0.5536266,
+ambiguity_ABC,10,trees_as_patients,A->-B A->-C B->-C,,10.0,,0.5536266,
+ambiguity_ABC,20,maestri,A->-B A->-C B->-C,0.16666666666666666,3.333333,20,1.0,1.0
+ambiguity_ABC,20,perm_tree,A->-B A->-C B->-C,0.16666666666666666,3.333333,20,0.5379619,0.000286923
+ambiguity_ABC,20,count_trees,A->-B A->-C B->-C,,20.0,,1.0,
+ambiguity_ABC,20,count_perm_tree,A->-B A->-C B->-C,,20.0,,0.5379619,
+ambiguity_ABC,20,trees_as_patients,A->-B A->-C B->-C,,20.0,,0.5379619,
+ambiguity_ABC,50,maestri,A->-B A->-C B->-C,0.16666666666666666,8.333333,50,1.0,1.0
+ambiguity_ABC,50,perm_tree,A->-B A->-C B->-C,0.16666666666666666,8.333333,50,0.5240247,1.394484e-09
+ambiguity_ABC,50,count_trees,A->-B A->-C B->-C,,50.0,,1.0,
+ambiguity_ABC,50,count_perm_tree,A->-B A->-C B->-C,,50.0,,0.5240247,
+ambiguity_ABC,50,trees_as_patients,A->-B A->-C B->-C,,50.0,,0.5240247,
+ambiguity_ABC,100,maestri,A->-B A->-C B->-C,0.16666666666666666,16.666667,100,1.0,1.0
+ambiguity_ABC,100,perm_tree,A->-B A->-C B->-C,0.16666666666666666,16.666667,100,0.5169916,1.944585e-18
+ambiguity_ABC,100,count_trees,A->-B A->-C B->-C,,100.0,,1.0,
+ambiguity_ABC,100,count_perm_tree,A->-B A->-C B->-C,,100.0,,0.5169916,
+ambiguity_ABC,100,trees_as_patients,A->-B A->-C B->-C,,100.0,,0.5169916,

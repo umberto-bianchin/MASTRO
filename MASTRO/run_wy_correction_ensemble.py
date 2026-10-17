@@ -193,7 +193,7 @@ def independent_assignment_transactions(lines, owner0, n_patients, rng):
     return sampled
 
 
-def permute_transactions(lines, owner0, n_patients, rng):
+def permute_transactions(lines, owner0, n_patients, rng, per_tree=False):
     """Create permuted transaction lines with per-patient coherent label permutation.
 
     For each patient i:
@@ -203,6 +203,9 @@ def permute_transactions(lines, owner0, n_patients, rng):
 
     The tree topology is preserved; only the assignment of mutation names
     to tree positions changes.
+
+    per_tree=True draws a fresh bijection of the same label set for every
+    tree instead (the 'perm_tree' ablation).
     """
     patient_indices = [[] for _ in range(n_patients)]
     for t in range(len(lines)):
@@ -238,6 +241,10 @@ def permute_transactions(lines, owner0, n_patients, rng):
         mapping = dict(zip(labels_sorted, shuffled))
 
         for t in indices:
+            if per_tree:
+                shuffled = labels_sorted.copy()
+                rng.shuffle(shuffled)
+                mapping = dict(zip(labels_sorted, shuffled))
             new_items = []
             for item in lines[t].split():
                 parsed = split_edge_item(item)
@@ -263,6 +270,42 @@ def permute_transactions(lines, owner0, n_patients, rng):
 # =====================================================================
 # Single-resample pipeline
 # =====================================================================
+def mine_family(graphs_path, rdir, lcmdir, sigma_mine, weights_path):
+    """Mine the complete trajectories of a dataset with weighted support >= sigma_mine.
+
+    transnum -> LCM -> convert_results -> filter_results, the pipeline of
+    run_pipeline.py. Returns the filtered result file, or None when nothing
+    is frequent.
+    """
+    table_file = rdir / "table_file"
+    graphs_ids = rdir / "graphs_ids.txt"
+    lcm_out = rdir / "lcm_out"
+    converted = rdir / "converted.txt"
+    filtered = rdir / "filtered.txt"
+    log_path = rdir / "lcm.log"
+
+    run_transnum(lcmdir, table_file, graphs_path, graphs_ids)
+    run_lcm(lcmdir, graphs_ids, sigma_mine, lcm_out, log_path,
+            weights_txt=weights_path)
+
+    if not lcm_out.exists() or lcm_out.stat().st_size == 0:
+        return None
+
+    run_cmd([PYTHON, str(SCRIPT_DIR / "convert_results.py"),
+             "-m", str(table_file), "-i", str(lcm_out),
+             "-o", str(converted)])
+
+    if not converted.exists() or converted.stat().st_size == 0:
+        return None
+
+    run_cmd([PYTHON, str(SCRIPT_DIR / "filter_results.py"),
+             "-i", str(converted), "-o", str(filtered)])
+
+    if not filtered.exists() or filtered.stat().st_size == 0:
+        return None
+    return filtered
+
+
 def _run_resample(args):
     """Worker: null sample -> mine -> significance -> extract p-values"""
     (r, graphs_path, weights_path, owner_path,
@@ -287,8 +330,9 @@ def _run_resample(args):
         )
 
         # Step 1: generate the null dataset
-        if null_model == "perm":
-            null_lines = permute_transactions(graphs_lines, owner0, n_patients, rng)
+        if null_model in ("perm", "perm_tree"):
+            null_lines = permute_transactions(graphs_lines, owner0, n_patients, rng,
+                                              per_tree=(null_model == "perm_tree"))
         elif null_model == "indep":
             null_lines = independent_assignment_transactions(
                 graphs_lines, owner0, n_patients, rng
@@ -313,33 +357,8 @@ def _run_resample(args):
             sigma_mine = float(theta_cand_sigma)
 
         # Step 2: mine (transnum -> LCM -> convert_results -> filter_results)
-        # Standard pipeline identical to run_pipeline.py, applied to the
-        # sampled dataset so we mine under the null distribution.
-        table_file = rdir / "table_file"
-        graphs_ids = rdir / "graphs_ids.txt"
-        lcm_out = rdir / "lcm_out"
-        converted = rdir / "converted.txt"
-        filtered = rdir / "filtered.txt"
-        log_path = rdir / "lcm.log"
-
-        run_transnum(lcmdir, table_file, null_path, graphs_ids)
-        run_lcm(lcmdir, graphs_ids, sigma_mine, lcm_out, log_path,
-                weights_txt=weights_path)
-
-        if not lcm_out.exists() or lcm_out.stat().st_size == 0:
-            return r, [], []
-
-        run_cmd([PYTHON, str(SCRIPT_DIR / "convert_results.py"),
-                 "-m", str(table_file), "-i", str(lcm_out),
-                 "-o", str(converted)])
-
-        if not converted.exists() or converted.stat().st_size == 0:
-            return r, [], []
-
-        run_cmd([PYTHON, str(SCRIPT_DIR / "filter_results.py"),
-                 "-i", str(converted), "-o", str(filtered)])
-
-        if not filtered.exists() or filtered.stat().st_size == 0:
+        filtered = mine_family(null_path, rdir, lcmdir, sigma_mine, weights_path)
+        if filtered is None:
             return r, [], []
 
         # Step 3: significance
@@ -439,7 +458,7 @@ def main():
                     help="Number of WY resamples (default: 100)")
     ap.add_argument("--test", choices=["exp", "theta", "both"], default="both",
                     help="Which significance test (default: both)")
-    ap.add_argument("--null", choices=["perm", "indep"], default="perm",
+    ap.add_argument("--null", choices=["perm", "indep", "perm_tree"], default="perm",
                     help="Null model for null resampling and significance "
                          "testing (default: perm)")
     ap.add_argument("--theta", type=float, default=1.0,

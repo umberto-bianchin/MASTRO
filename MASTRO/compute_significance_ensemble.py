@@ -13,6 +13,9 @@
 #   - 'indep' null model: each alteration of P is placed i.i.d. uniformly
 #             on the alteration set (matches MASTRO's baseline denominator
 #             |A_i|^k)
+#   - 'perm_tree' null model: an independent permutation sigma_ij of A_i for
+#             every candidate tree j of patient i (ablation of 'perm': the
+#             trees of a patient no longer move together)
 #   - Exact computation when M_i <= --mc_cutoff and the total number of
 #     placements fits --max_exact_placements
 #   - Monte-Carlo fallback otherwise (--mc_samples draws per patient)
@@ -170,7 +173,7 @@ def pattern_expected_matrix(pattern_items):
 # Generate null placements of trajectory nodes onto patient alterations
 def build_placements_exact(n_alt, k, null_model, max_placements):
     """Build the full placement matrix, or return None if it is too large"""
-    if null_model == "perm":
+    if null_model in ("perm", "perm_tree"):
         # More pattern nodes than alterations: no injective placement exists
         if k > n_alt:
             return np.zeros((0, k), dtype=np.int32)
@@ -190,7 +193,7 @@ def build_placements_exact(n_alt, k, null_model, max_placements):
 
 def build_placements_mc(n_alt, k, B, null_model, rng):
     """Sample a placement matrix from the selected null model"""
-    if null_model == "perm":
+    if null_model in ("perm", "perm_tree"):
         # More pattern nodes than alterations: no injective placement exists
         if k > n_alt:
             return np.zeros((0, k), dtype=np.int32)
@@ -292,7 +295,9 @@ def compute_phi_i(rel_tensor, weights_i, pattern_items, alterations,
     # Build the null realizations h: pattern nodes -> patient alterations
     placements = None
     used_mc = False
-    if M <= mc_cutoff:
+    # Under 'perm_tree' the trees are scored one at a time, so exact enumeration
+    # does not grow with M and the M_i cutoff does not apply
+    if M <= mc_cutoff or null_model == "perm_tree":
         placements = build_placements_exact(n_alt, k, null_model, max_exact_placements)
     if placements is None:
         placements = build_placements_mc(n_alt, k, mc_samples, null_model, rng)
@@ -308,6 +313,23 @@ def compute_phi_i(rel_tensor, weights_i, pattern_items, alterations,
 
     # Estimate r_i(J) by counting how often each match set appears
     counter = Counter(match_sets)
+
+    if null_model == "perm_tree":
+        # Independent sigma_ij per tree: tree j matches with its own marginal
+        # probability q_j, so pi_i is a sum of independent weighted Bernoullis
+        q = [0.0] * M
+        for J_set, cnt in counter.items():
+            for j in J_set:
+                q[j] += cnt / float(B_total)
+        phi = {0: 1.0}
+        for j in range(M):
+            step = int(round(L * weights_i[j]))
+            new_phi = defaultdict(float)
+            for e, p in phi.items():
+                new_phi[e] += p * (1.0 - q[j])
+                new_phi[e + step] += p * q[j]
+            phi = new_phi
+        return dict(phi), used_mc
     phi = defaultdict(float)
     for J_set, cnt in counter.items():
         rj = cnt / float(B_total)
@@ -565,7 +587,7 @@ def main():
                     help="weights.txt (optional; default: all 1.0, single-tree)")
     ap.add_argument("--owner", default=None,
                     help="owner.txt (optional; default: identity 0..K-1, single-tree)")
-    ap.add_argument("--null", choices=["indep", "perm"], default="perm",
+    ap.add_argument("--null", choices=["indep", "perm", "perm_tree"], default="perm",
                     help="Null model for alteration placement (default: perm)")
     ap.add_argument("--test", choices=["exp", "theta", "both"], default="both",
                     help="Which significance test to run (default: both)")

@@ -230,6 +230,51 @@ POTTR environment's interpreter as `--pottr_python`):
 
 All write under `results/pottr_toy/`.
 
+### Ablations: one design choice broken at a time
+
+Five variants of the test, which differ only in their inputs to
+`compute_significance_ensemble.py`:
+
+| Variant | Weights | Owner | Null |
+|---|---|---|---|
+| `maestri` | 1/M_i | patient | `perm` (one permutation per patient) |
+| `perm_tree` | 1/M_i | patient | `perm_tree` (one permutation per tree) |
+| `count_trees` | 1 | patient | `perm` |
+| `count_perm_tree` | 1 | patient | `perm_tree` |
+| `trees_as_patients` | 1 | tree | `perm` |
+
+`count_perm_tree` and `trees_as_patients` have the same expected-support law
+whenever the trees of a patient share its alteration set.
+
+`ablation_toys.py` (local, seconds) runs the hand-built cohorts:
+- `shape`: 100 A->B trees spread over 1 to 100 patients;
+- `competition`: one patient with M A->B trees against 100 patients with B->A;
+- `duplication`: every tree copied M times;
+- `ambiguity`: every order present in every patient;
+- `resolution`: same-node A,B resolved or not, computed exactly and on its own.
+
+Each toy writes `results/ablation_toys/<toy>.csv`, and
+`plot_ablation_toys.py` draws them all in one figure.
+
+`run_ablation.sh` (server) runs `ablation_calibration.py` on real cohorts.
+Every variant scores the same family, the Multi-MASTRO trajectories with
+weighted support >= sigma. A variant calibrates WY on resamples from its own
+null, and its FWER is measured on datasets from the per-patient null. Using the
+per-patient null for every variant's WY would calibrate them all by
+construction. The same run also gives:
+- the real-data discoveries of every variant;
+- the Q-Q plot of the real-data family rescored on the null datasets.
+
+The Q-Q plot uses that fixed family because a family mined on each null dataset
+is selected for support and drifts above the diagonal even under a valid test.
+The script is resumable.
+
+Writes `results/ablation/<dataset>_sigma<S>/`: `fwer.csv`, `discoveries.csv`,
+`minima.csv`, `pvals*/` and `qq_perm_val_{fixed,mined}.pdf`.
+
+Knobs: `DATASETS` (breastCancer, tracerx), `SIGMA_LIST`, `N_CAL`, `N_VAL`,
+`PAR`, `MC_SAMPLES`.
+
 ### Runtime comparison against POTTR
 
 `run_timing_pottr_vs_mastro.sh`
