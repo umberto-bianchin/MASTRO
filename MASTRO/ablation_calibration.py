@@ -97,7 +97,7 @@ def read_pvals(path):
 def _run_dataset(args):
     (pool, r, graphs_path, weights_path, owner_path, owner0, n_patients,
      files, variants, sigma, lcmdir, workdir, outdir, mc_cutoff, mc_samples,
-     seed, keep, verbose, fixed) = args
+     seed, keep, verbose, fixed, n_jobs) = args
     set_verbose(verbose)
     out_csv = outdir / "pvals" / pool / f"{r}.csv.gz"
     fixed_csv = outdir / "pvals_fixed" / pool / f"{r}.csv.gz"
@@ -128,7 +128,7 @@ def _run_dataset(args):
                          "-w", str(w), "--owner", str(o), "--graphs_all", str(data),
                          "--test", "exp", "--null", null,
                          "--mc_cutoff", str(mc_cutoff), "--mc_samples", str(mc_samples),
-                         "--seed", str(seed + r)])
+                         "--seed", str(seed + r), "--n_jobs", str(n_jobs)])
                 for pat, p in read_pvals(sig).items():
                     table.setdefault(pat, {})[v] = p
             return table
@@ -270,14 +270,17 @@ def main():
         workdir = outdir / "work"
         ensure_dir(workdir)
 
-        def task(pool, r, fixed=None):
+        def task(pool, r, fixed=None, n_jobs=1):
             return (pool, r, graphs_path, weights_path, owner_path, owner0, n_patients,
                     files, variants, args.sigma, Path(args.lcmdir).resolve(), workdir,
                     outdir, args.mc_cutoff, args.mc_samples, args.seed, args.keep,
-                    args.verbose, fixed)
+                    args.verbose, fixed, n_jobs)
 
-        # The real cohort first: its family is the fixed family of the Q-Q plot
-        results = [_run_dataset(task("real", 0))]
+        # The real cohort first: its family is the fixed family of the Q-Q plot.
+        # It runs alone, so its significance step uses every core (parallel
+        # over trajectories) instead of one
+        print("[ABL] real cohort first (significance on all cores)", flush=True)
+        results = [_run_dataset(task("real", 0, n_jobs=args.par))]
         fixed = real_family(outdir)
         pools = [("perm_cal", args.n_cal), ("perm_val", args.n_val)]
         if any(VARIANTS[v][3] == "tree_cal" for v in variants):
