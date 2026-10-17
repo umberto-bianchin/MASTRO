@@ -1,0 +1,30 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+# Environment for the Multi-MASTRO pipeline on the DEI cluster: gcc for LCM,
+# perl for transnum.pl, Python 3.12 with the packages of requirements.txt.
+# The code stays outside the image, in the home directory.
+#
+# Build on a compute node (apptainer is not installed on the login node):
+#   sinteractive --time=01:00:00 --mem 8G
+#   apptainer build ~/images/mastro.sif ~/MASTRO/MASTRO/scripts/dei/mastro.def
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        build-essential perl \
+        python3 python-is-python3 \
+        python3-numpy python3-pandas python3-matplotlib python3-networkx \
+        python3-tqdm python3-filelock
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+%environment
+    export LC_ALL=C.UTF-8
+    export MPLBACKEND=Agg
+
+%test
+    python3 -c "import numpy, pandas, matplotlib, networkx, tqdm, filelock"
+    perl -v >/dev/null
+    gcc --version >/dev/null

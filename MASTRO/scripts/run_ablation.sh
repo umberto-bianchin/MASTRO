@@ -30,7 +30,12 @@ MC_CUTOFF=${MC_CUTOFF:-8}
 ALPHAS=${ALPHAS:-0.01,0.05,0.1}
 OUT_BASE=${OUT_BASE:-results/ablation}
 
-[ -x lcm53/lcm ] || ( echo "building LCM"; cd lcm53 && make )
+# The tracked lcm53/lcm is a macOS binary: rebuild when it cannot run here
+# (exit 126/127 = not executable / wrong architecture)
+set +e; lcm53/lcm >/dev/null 2>&1; RC=$?; set -e
+if [ "$RC" -eq 126 ] || [ "$RC" -eq 127 ]; then
+  echo "building LCM"; ( cd lcm53 && make -B )
+fi
 
 for DS in $DATASETS; do
   for SIGMA in $SIGMA_LIST; do

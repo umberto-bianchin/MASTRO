@@ -1,0 +1,36 @@
+#!/bin/bash
+#SBATCH --job-name=mastro-ablation
+#SBATCH --output=%x.%j.out
+#SBATCH --error=%x.%j.err
+#SBATCH --partition=allgroups
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=96
+#SBATCH --mem=500G
+#SBATCH --time=3-00:00:00
+# =============================================================================
+# scripts/run_ablation.sh on one DEI compute node, inside ~/images/mastro.sif
+# (built from scripts/dei/mastro.def). PAR follows --cpus-per-task.
+#
+# Submit from the code directory (<repo>/MASTRO); the knobs of run_ablation.sh
+# pass through the environment, and sbatch flags override the defaults above:
+#   cd ~/MASTRO/MASTRO
+#   DATASETS=breastCancer N_CAL=20 N_VAL=20 \
+#     sbatch --time=06:00:00 scripts/dei/run_ablation.slurm      # timing run
+#   DATASETS=breastCancer sbatch scripts/dei/run_ablation.slurm   # full run
+#   DATASETS=tracerx sbatch --cpus-per-task=32 --mem=64G scripts/dei/run_ablation.slurm
+#   whole runner-11 (192 cores):  sbatch --cpus-per-task=192 --nodelist=runner-11 ...
+#
+# The run is resumable: if the job hits its time limit, submit it again.
+# Check the peak memory afterwards with  sacct -j <JOBID> --format=MaxRSS,Elapsed
+# =============================================================================
+set -euo pipefail
+
+SIF=${SIF:-$HOME/images/mastro.sif}
+cd "$SLURM_SUBMIT_DIR"
+[ -f scripts/run_ablation.sh ] || { echo "submit from <repo>/MASTRO" >&2; exit 1; }
+[ -f "$SIF" ] || { echo "image $SIF not found" >&2; exit 1; }
+
+export PAR=${PAR:-$SLURM_CPUS_PER_TASK}
+echo "node=$(hostname) cpus=$SLURM_CPUS_PER_TASK PAR=$PAR DATASETS=${DATASETS:-default}"
+srun apptainer exec "$SIF" bash scripts/run_ablation.sh
