@@ -7,10 +7,9 @@ is anti-conservative. --family mined plots the family mined on each null
 dataset instead, which is selected for support and drifts above the diagonal
 even under a valid test.
 
-The y axis is cut at --ymax (default: 1.3 x the largest expected value), so
-one anti-conservative variant does not flatten the others; points beyond it
-are drawn as triangles on the edge and counted in the legend. The grey band is the pointwise 95% band of the order
-statistics of independent uniform p-values.
+The y axis is linear up to --ymax (default: 1.3 x the largest expected value)
+and compressed above it (dotted line), so one anti-conservative variant does
+not flatten the others while its whole tail stays visible.
 
 The plotted points are also written to qq_<pool>_<family>.csv (thinned in the
 bulk, complete in the tail), and the plot is redrawn from that file when the
@@ -38,6 +37,7 @@ STYLE = {
 }
 DEFAULT_VARIANTS = "maestri,count_trees,perm_tree,trees_as_patients"
 FLOOR = 1e-300
+COMPRESS = 0.35   # height of the compressed y range, relative to the linear one
 
 
 def load_raw(d, sub, pool):
@@ -64,18 +64,6 @@ def qq_points(ps, keep_bulk=3000):
         bulk = bulk[np.linspace(0, len(bulk) - 1, keep_bulk).astype(int)]
     idx = np.concatenate([np.nonzero(tail)[0], bulk])
     return exp[idx], obs[idx], n
-
-
-def uniform_band(n, n_points=200, n_sim=400, seed=0):
-    """Pointwise 95% band of -log10 order statistics of n uniforms."""
-    rng = np.random.default_rng(seed)
-    ranks = np.unique(np.geomspace(1, n, n_points).astype(int)) - 1
-    sims = np.empty((n_sim, len(ranks)))
-    for s in range(n_sim):
-        sims[s] = np.sort(rng.random(n))[ranks]
-    lo, hi = np.quantile(sims, [0.025, 0.975], axis=0)
-    exp = -np.log10((ranks + 1) / (n + 1))
-    return exp, -np.log10(hi), -np.log10(lo)
 
 
 def main():
@@ -123,25 +111,40 @@ def main():
     top = -np.log10(1 / (n + 1))
     ymax = args.ymax or 1.3 * top
 
+    ymax_all = max(pts[v][1].max() for v in variants)
     fig, ax = plt.subplots(figsize=(4.6, 4.6))
-    be, blo, bhi = uniform_band(n)
-    ax.fill_between(be, blo, bhi, color="0.85", lw=0, label="95% band, uniform")
     ax.plot([0, top], [0, top], color="0.4", lw=0.8, ls="--")
-
     for v in variants:
-        e, o, nv = pts[v]
+        e, o, _ = pts[v]
         name, c = STYLE.get(v, (v, None))
-        inside = o <= ymax
-        label = name
-        if (~inside).any():
-            label += f"  ({(~inside).sum()} beyond, min p = 1e-{o.max():.0f})"
-        ax.plot(e[inside], o[inside], ".", ms=2.5, color=c, label=label)
-        if (~inside).any():
-            ax.plot(e[~inside], np.full((~inside).sum(), ymax), "^", ms=4,
-                    color=c, clip_on=False)
+        ax.plot(e, o, ".", ms=2.5, color=c, label=name)
+
+    if ymax_all > ymax:
+        # Piecewise y scale: linear up to ymax, then compressed so that the
+        # range [ymax, ymax_all] takes COMPRESS of the height below ymax
+        hi = ymax_all * 1.05
+        c = COMPRESS * ymax / (hi - ymax)
+
+        def fwd(y):
+            y = np.asarray(y, dtype=float)
+            return np.where(y <= ymax, y, ymax + (y - ymax) * c)
+
+        def inv(y):
+            y = np.asarray(y, dtype=float)
+            return np.where(y <= ymax, y, ymax + (y - ymax) / c)
+
+        ax.set_yscale("function", functions=(fwd, inv))
+        ax.set_ylim(0, hi)
+        step = max(1, int(np.ceil(ymax / 6)))
+        big = 5 * max(1, int(np.ceil((hi - ymax) / 15)))
+        ticks = list(range(0, int(ymax) + 1, step))
+        ticks += list(range(big * (int(ymax) // big + 1), int(hi) + 1, big))
+        ax.set_yticks(ticks)
+        ax.axhline(ymax, color="0.6", lw=0.6, ls=":")
+    else:
+        ax.set_ylim(0, ymax)
 
     ax.set_xlim(0, top * 1.03)
-    ax.set_ylim(0, ymax)
     ax.set_xlabel(r"expected $-\log_{10} p$", fontsize=8)
     ax.set_ylabel(r"observed $-\log_{10} p$", fontsize=8)
     ax.set_title(args.title or f"{d.name}: {n} null p-values per variant", fontsize=9)
