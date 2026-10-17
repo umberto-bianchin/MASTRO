@@ -38,7 +38,10 @@ Outputs in --outdir:
   pvals/<pool>/<r>.csv.gz   pattern + one p-value column per variant
   pvals_fixed/perm_val/<r>.csv.gz   same, real-data family (Q-Q)
   minima.csv                per-dataset minimum p-value per variant
-  fwer.csv                  WY threshold, empirical FWER (+- binomial SE) and
+  real_pvalues.csv          p-values of the real-data family (plain CSV, so
+                            that git carries it)
+  fwer.csv                  WY threshold, empirical FWER (mean +- sd over
+                            bootstrap calibration/validation splits) and
                             real-data discoveries per variant and alpha
   discoveries.csv           the real-data discoveries per variant and alpha
 
@@ -192,38 +195,73 @@ def wy_threshold(minima, alpha):
     return s[max(0, int(np.floor(alpha * len(s))) - 1)]
 
 
-def analyze(outdir, variants, alphas, n_cal, n_val):
+def analyze(outdir, variants, alphas, n_trials, m_cal, seed):
+    """Empirical FWER over bootstrap calibration/validation splits.
+
+    In every trial a variant's WY threshold is the alpha-quantile of m_cal
+    minima drawn from its own calibration pool, and the FWER is the fraction of
+    validation datasets (per-patient null) whose minimum falls below it. For
+    the 'perm' variants calibration and validation come from the same null, so
+    the pool perm_cal + perm_val is split at random in every trial, as in
+    empirical_fwer_ensemble.py; a single split leaves a quantile error of about
+    sqrt(alpha/m) on the FWER. The discovery threshold uses the whole own pool.
+    """
     mins = {}
     with (outdir / "minima.csv").open() as f:
         for row in csv.DictReader(f):
-            mins.setdefault(row["pool"], {})[int(row["r"])] = {v: float(row[v]) for v in variants}
-    real_csv = outdir / "pvals" / "real" / "0.csv.gz"
-    real = []
-    if real_csv.exists():
-        with gzip.open(real_csv, "rt") as f:
+            mins.setdefault(row["pool"], []).append({v: float(row[v]) for v in variants})
+    real_gz = outdir / "pvals" / "real" / "0.csv.gz"
+    real_csv = outdir / "real_pvalues.csv"
+    if real_gz.exists():
+        with gzip.open(real_gz, "rt") as f:
             real = list(csv.DictReader(f))
+        with real_csv.open("w", newline="") as f:
+            wr = csv.DictWriter(f, fieldnames=["pattern"] + variants)
+            wr.writeheader()
+            wr.writerows(real)
+    elif real_csv.exists():
+        real = list(csv.DictReader(real_csv.open()))
+    else:
+        real = None
+        print("[ABL] no real-data p-values here: FWER only, discoveries left blank")
 
+    rng = np.random.default_rng(seed + 2)
     rows, disc = [], []
     for v in variants:
-        cal_pool = VARIANTS[v][3]
-        cal = [mins[cal_pool][r][v] for r in range(n_cal)]
-        val = np.array([mins["perm_val"][r][v] for r in range(n_val)])
+        own = VARIANTS[v][3]
+        perm_all = np.array([d[v] for d in mins.get("perm_cal", []) + mins.get("perm_val", [])])
+        own_all = perm_all if own == "perm_cal" else np.array([d[v] for d in mins[own]])
+        n_val = len(perm_all) - m_cal if own == "perm_cal" else len(perm_all)
         for a in alphas:
-            d = wy_threshold(cal, a)
-            fwer = float(np.mean(val <= d))
-            hits = [row["pattern"] for row in real if float(row[v]) <= d]
-            rows.append({"variant": v, "alpha": a, "wy_pool": cal_pool,
-                         "threshold": f"{d:.6e}", "fwer": f"{fwer:.4f}",
-                         "fwer_se": f"{np.sqrt(fwer * (1 - fwer) / len(val)):.4f}",
-                         "n_family_real": len(real), "n_discoveries": len(hits)})
+            fw = []
+            for _ in range(n_trials):
+                if own == "perm_cal":
+                    idx = rng.permutation(len(perm_all))
+                    cal, val = perm_all[idx[:m_cal]], perm_all[idx[m_cal:]]
+                else:
+                    cal = own_all[rng.choice(len(own_all), size=m_cal, replace=False)]
+                    val = perm_all
+                fw.append(float(np.mean(val <= wy_threshold(cal, a))))
+            d = wy_threshold(own_all, a)
+            hits = [row["pattern"] for row in real or [] if float(row[v]) <= d]
+            rows.append({"variant": v, "alpha": a, "wy_pool": own,
+                         "threshold": f"{d:.6e}",
+                         "fwer_mean": f"{np.mean(fw):.4f}", "fwer_sd": f"{np.std(fw):.4f}",
+                         "m_cal": m_cal, "n_val": n_val, "n_trials": n_trials,
+                         "n_family_real": "" if real is None else len(real),
+                         "n_discoveries": "" if real is None else len(hits)})
             disc += [{"variant": v, "alpha": a, "pattern": h} for h in hits]
-            print(f"[ABL] {v:18s} alpha={a:.2f} delta={d:.3e} (WY on {cal_pool})  "
-                  f"FWER={fwer:.4f}  discoveries={len(hits)}/{len(real)}")
+            print(f"[ABL] {v:18s} alpha={a:.2f} delta={d:.3e} (WY on {own})  "
+                  f"FWER={np.mean(fw):.4f} +- {np.std(fw):.4f}  "
+                  + ("" if real is None else f"discoveries={len(hits)}/{len(real)}"))
 
     with (outdir / "fwer.csv").open("w", newline="") as f:
         wr = csv.DictWriter(f, fieldnames=list(rows[0]))
         wr.writeheader()
         wr.writerows(rows)
+    if real is None:
+        print(f"[ABL] written -> {outdir / 'fwer.csv'}")
+        return
     with (outdir / "discoveries.csv").open("w", newline="") as f:
         wr = csv.DictWriter(f, fieldnames=["variant", "alpha", "pattern"])
         wr.writeheader()
@@ -251,6 +289,10 @@ def main():
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--verbose", action="store_true")
     ap.add_argument("--analyze_only", action="store_true")
+    ap.add_argument("--n_trials", type=int, default=1000,
+                    help="Bootstrap calibration/validation splits for the FWER")
+    ap.add_argument("--m_cal", type=int, default=None,
+                    help="Calibration minima per split (default: n_cal // 2)")
     args = ap.parse_args()
 
     set_verbose(args.verbose)
@@ -304,7 +346,8 @@ def main():
             for pool_name, r, m in sorted(results, key=lambda x: (x[0], x[1])):
                 wr.writerow([pool_name, r] + [f"{m[v]:.6e}" for v in variants])
 
-    analyze(outdir, variants, alphas, args.n_cal, args.n_val)
+    analyze(outdir, variants, alphas, args.n_trials,
+            args.m_cal or args.n_cal // 2, args.seed)
 
 
 if __name__ == "__main__":
