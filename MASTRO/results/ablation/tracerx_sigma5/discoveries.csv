@@ -1,5 +1,4 @@
 variant,alpha,pattern
-maestri,0.01,KRAS_M-?-STK11_N
 maestri,0.01,TP53_M->-UBR5_M
 maestri,0.05,KRAS_M-?-STK11_N
 maestri,0.05,TP53_M->-UBR5_M
@@ -20,14 +19,12 @@ perm_tree,0.1,TP53_M->-UBR5_M
 perm_tree,0.1,TP53_M->-CHD4_M
 perm_tree,0.1,TP53_M->-CYLD_M
 perm_tree,0.1,KRAS_M->-TET2_M
-count_trees,0.01,KRAS_M-?-STK11_N
 count_trees,0.01,TP53_M->-UBR5_M
 count_trees,0.05,KRAS_M-?-STK11_N
 count_trees,0.05,TP53_M->-UBR5_M
 count_trees,0.1,KRAS_M-?-STK11_N
 count_trees,0.1,TP53_M->-UBR5_M
 count_trees,0.1,TP53_M->-CHD4_M
-count_trees,0.1,KRAS_M->-TET2_M
 count_perm_tree,0.01,KRAS_M-?-STK11_N
 count_perm_tree,0.01,KEAP1_M-?-KRAS_M
 count_perm_tree,0.01,CDKN2A_M-?-TP53_M
