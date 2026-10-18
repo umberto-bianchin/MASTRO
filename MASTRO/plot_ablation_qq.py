@@ -37,6 +37,7 @@ STYLE = {
 }
 DEFAULT_VARIANTS = "maestri,count_trees,perm_tree,trees_as_patients"
 FLOOR = 1e-300
+CAP = -np.log10(FLOOR)   # where p-values below FLOOR (and exact zeros) are drawn
 COMPRESS = 0.35   # height of the compressed y range, relative to the linear one
 
 
@@ -137,10 +138,19 @@ def main():
         ax.set_yscale("function", functions=(fwd, inv))
         ax.set_ylim(0, hi)
         step = max(1, int(np.ceil(ymax / 6)))
-        big = 5 * max(1, int(np.ceil((hi - ymax) / 15)))
+        big = next(b for b in (5, 10, 20, 25, 50, 100, 200, 500)
+                   if (ymax_all - ymax) / b <= 4)
         ticks = list(range(0, int(ymax) + 1, step))
-        ticks += list(range(big * (int(ymax) // big + 1), int(hi) + 1, big))
+        ticks += list(range(big * (int(ymax) // big + 1), int(ymax_all) + 1, big))
+        labels = [str(t) for t in ticks]
+        if ymax_all >= CAP - 1e-6:
+            # p-values below FLOOR (underflow to 0 included) sit on this line
+            if ticks[-1] != int(CAP):
+                ticks.append(int(CAP))
+                labels.append(str(int(CAP)))
+            labels[-1] = r"$\geq$" + labels[-1]
         ax.set_yticks(ticks)
+        ax.set_yticklabels(labels)
         ax.axhline(ymax, color="0.6", lw=0.6, ls=":")
     else:
         ax.set_ylim(0, ymax)
