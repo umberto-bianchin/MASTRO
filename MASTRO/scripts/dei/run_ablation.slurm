@@ -5,7 +5,7 @@
 #SBATCH --partition=allgroups
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=96
+#SBATCH --cpus-per-task=94
 #SBATCH --mem=500G
 #SBATCH --time=3-00:00:00
 # =============================================================================
@@ -18,8 +18,9 @@
 #   DATASETS=breastCancer N_CAL=20 N_VAL=20 \
 #     sbatch --time=06:00:00 scripts/dei/run_ablation.slurm      # timing run
 #   DATASETS=breastCancer sbatch scripts/dei/run_ablation.slurm   # full run
-#   DATASETS=tracerx sbatch --cpus-per-task=32 --mem=64G scripts/dei/run_ablation.slurm
-#   whole runner-11 (192 cores):  sbatch --cpus-per-task=192 --nodelist=runner-11 ...
+#   DATASETS=tracerx sbatch --cpus-per-task=30 --mem=64G scripts/dei/run_ablation.slurm
+#   2 cores per node are reserved for the system: 94 fits a 96-core runner,
+#   190 is the whole runner-11:  sbatch --cpus-per-task=190 --nodelist=runner-11 ...
 #
 # The run is resumable: if the job hits its time limit, submit it again.
 # Check the peak memory afterwards with  sacct -j <JOBID> --format=MaxRSS,Elapsed
