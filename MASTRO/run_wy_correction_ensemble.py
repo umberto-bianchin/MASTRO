@@ -295,11 +295,15 @@ def mine_family(graphs_path, rdir, lcmdir, sigma_mine, weights_path):
              "-m", str(table_file), "-i", str(lcm_out),
              "-o", str(converted)])
 
+    # The raw LCM output (every frequent itemset) can take tens of GB at a low
+    # sigma; it is not needed once converted, nor the conversion once filtered
+    lcm_out.unlink()
     if not converted.exists() or converted.stat().st_size == 0:
         return None
 
     run_cmd([PYTHON, str(SCRIPT_DIR / "filter_results.py"),
              "-i", str(converted), "-o", str(filtered)])
+    converted.unlink()
 
     if not filtered.exists() or filtered.stat().st_size == 0:
         return None

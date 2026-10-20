@@ -33,5 +33,10 @@ cd "$SLURM_SUBMIT_DIR"
 [ -f "$SIF" ] || { echo "image $SIF not found" >&2; exit 1; }
 
 export PAR=${PAR:-$SLURM_CPUS_PER_TASK}
-echo "node=$(hostname) cpus=$SLURM_CPUS_PER_TASK PAR=$PAR DATASETS=${DATASETS:-default}"
+# Mining scratch in RAM on the node, not in the 50 GB home quota: at sigma=2 a
+# single null dataset wrote 22 GB of LCM output. tmpfs counts against --mem.
+export WORKDIR=${WORKDIR:-/dev/shm/$USER-$SLURM_JOB_ID}
+mkdir -p "$WORKDIR"
+trap 'rm -rf "$WORKDIR"' EXIT
+echo "node=$(hostname) cpus=$SLURM_CPUS_PER_TASK PAR=$PAR DATASETS=${DATASETS:-default} SIGMA_LIST=${SIGMA_LIST:-default} WORKDIR=$WORKDIR"
 srun apptainer exec "$SIF" bash scripts/run_ablation.sh

@@ -286,6 +286,10 @@ def main():
     ap.add_argument("--lcmdir", default="./lcm53")
     ap.add_argument("--par", type=int, default=1)
     ap.add_argument("--outdir", required=True)
+    ap.add_argument("--workdir", default=None,
+                    help="Scratch for the per-dataset mining files (default: "
+                         "OUTDIR/work); at low sigma one dataset can take tens "
+                         "of GB, so on a cluster point it at node-local storage")
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--verbose", action="store_true")
     ap.add_argument("--analyze_only", action="store_true")
@@ -309,7 +313,7 @@ def main():
         inputs = outdir / "inputs"
         ensure_dir(inputs)
         files = variant_files(inputs, weights_path, owner_path, K)
-        workdir = outdir / "work"
+        workdir = Path(args.workdir).resolve() if args.workdir else outdir / "work"
         ensure_dir(workdir)
 
         def task(pool, r, fixed=None, n_jobs=1):
