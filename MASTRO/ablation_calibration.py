@@ -62,7 +62,8 @@ from pathlib import Path
 
 import numpy as np
 
-from utils import PYTHON, SCRIPT_DIR, ensure_dir, load_weights_and_owner, run_cmd, set_verbose
+from utils import (PYTHON, SCRIPT_DIR, ensure_dir, load_weights_and_owner, run_cmd,
+                   set_verbose, wy_threshold)
 from run_wy_correction_ensemble import mine_family, permute_transactions
 
 VARIANTS = {
@@ -187,12 +188,6 @@ def _minima(path, variants):
             for v in variants:
                 m[v] = min(m[v], float(row[v]))
     return m
-
-
-def wy_threshold(minima, alpha):
-    """alpha-quantile of the calibration minima, as in empirical_fwer_ensemble."""
-    s = np.sort(np.asarray(minima))
-    return s[max(0, int(np.floor(alpha * len(s))) - 1)]
 
 
 def analyze(outdir, variants, alphas, n_trials, m_cal, seed):

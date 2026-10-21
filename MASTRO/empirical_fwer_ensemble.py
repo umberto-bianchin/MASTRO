@@ -40,6 +40,7 @@ from pathlib import Path
 import numpy as np
 
 from utils import ensure_dir, load_weights_and_owner, set_verbose
+from utils import wy_threshold as _wy_threshold
 from run_wy_correction_ensemble import _run_resample
 
 
@@ -48,9 +49,9 @@ def _min_or_one(vals):
 
 
 def wy_threshold(sorted_minima, alpha, m):
-    """WY-corrected threshold: the alpha-quantile of the calibration minima."""
-    idx = max(0, int(np.floor(alpha * m)) - 1)
-    return sorted_minima[idx]
+    """WY-corrected threshold of the m calibration minima (tie-aware, see
+    utils.wy_threshold)."""
+    return _wy_threshold(sorted_minima[:m], alpha)
 
 
 def main():
@@ -81,6 +82,9 @@ def main():
     ap.add_argument("--verbose", action="store_true",
                     help="Echo every per-dataset subcommand (default: quiet)")
     ap.add_argument("--outdir", required=True)
+    ap.add_argument("--from_pool", action="store_true",
+                    help="Skip the null-dataset pool and rerun only the "
+                         "bootstrap on OUTDIR/pool_min_pvalues.csv")
     args = ap.parse_args()
 
     if args.m >= args.n_datasets:
@@ -91,64 +95,71 @@ def main():
     lcmdir = Path(args.lcmdir).resolve()
     outdir = Path(args.outdir).resolve()
     ensure_dir(outdir)
-    workdir = outdir / "resamples"
-    ensure_dir(workdir)
-
-    graphs_path = Path(args.graphs_all).resolve()
-    weights_path = Path(args.weights).resolve()
-    owner_path = Path(args.owner).resolve()
-
-    graphs_lines = [l.rstrip("\n") for l in open(graphs_path)]
-    _, _owner0, n_patients, K = load_weights_and_owner(weights_path, owner_path)
-    assert len(graphs_lines) == K, (
-        f"graphs has {len(graphs_lines)} lines but weights/owner has {K}")
-
     alphas = [float(a) for a in args.alphas.split(",") if a.strip()]
+    pool_csv = outdir / "pool_min_pvalues.csv"
+    if args.from_pool:
+        # Bootstrap only, on the pool minima saved by an earlier run
+        pool = np.genfromtxt(pool_csv, delimiter=",", names=True)
+        min_exp, min_theta = pool["min_pval_exp"], pool["min_pval_theta"]
+        if len(min_exp) != args.n_datasets:
+            ap.error(f"{pool_csv} has {len(min_exp)} datasets, not --n_datasets")
+    else:
+        workdir = outdir / "resamples"
+        ensure_dir(workdir)
 
-    print(f"[CAL] graphs={graphs_path.name} n_patients={n_patients} K={K}")
-    print(f"[CAL] null={args.null} sigma={args.sigma} theta={args.theta}")
-    print(f"[CAL] pool N={args.n_datasets} m={args.m} trials R={args.n_trials} "
-          f"par={args.par}")
+        graphs_path = Path(args.graphs_all).resolve()
+        weights_path = Path(args.weights).resolve()
+        owner_path = Path(args.owner).resolve()
 
-    # Step 1: build the null-dataset pool and record per-dataset minima
-    worker_args = []
-    for r in range(args.n_datasets):
-        # Last element is theta_cand_sigma (see run_wy_correction_ensemble
-        # ._run_resample): None = mine the null at sigma itself, the setting
-        # under which the reported calibration was produced.
-        worker_args.append((
-            r, graphs_path, weights_path, owner_path,
-            args.sigma, lcmdir, workdir,
-            args.test, args.null, args.theta,
-            args.mc_cutoff, args.mc_samples,
-            args.seed, not args.keep, args.verbose, None,
-        ))
+        graphs_lines = [l.rstrip("\n") for l in open(graphs_path)]
+        _, _owner0, n_patients, K = load_weights_and_owner(weights_path, owner_path)
+        assert len(graphs_lines) == K, (
+            f"graphs has {len(graphs_lines)} lines but weights/owner has {K}")
 
-    total = args.n_datasets
-    step = max(1, total // 100)
-    results = []
-    if args.par > 1:
-        with Pool(args.par) as pool:
-            for done, res in enumerate(
-                    pool.imap_unordered(_run_resample, worker_args), 1):
-                results.append(res)
+        print(f"[CAL] graphs={graphs_path.name} n_patients={n_patients} K={K}")
+        print(f"[CAL] null={args.null} sigma={args.sigma} theta={args.theta}")
+        print(f"[CAL] pool N={args.n_datasets} m={args.m} trials R={args.n_trials} "
+              f"par={args.par}")
+
+        # Step 1: build the null-dataset pool and record per-dataset minima
+        worker_args = []
+        for r in range(args.n_datasets):
+            # Last element is theta_cand_sigma (see run_wy_correction_ensemble
+            # ._run_resample): None = mine the null at sigma itself, the setting
+            # under which the reported calibration was produced.
+            worker_args.append((
+                r, graphs_path, weights_path, owner_path,
+                args.sigma, lcmdir, workdir,
+                args.test, args.null, args.theta,
+                args.mc_cutoff, args.mc_samples,
+                args.seed, not args.keep, args.verbose, None,
+            ))
+
+        total = args.n_datasets
+        step = max(1, total // 100)
+        results = []
+        if args.par > 1:
+            with Pool(args.par) as pool:
+                for done, res in enumerate(
+                        pool.imap_unordered(_run_resample, worker_args), 1):
+                    results.append(res)
+                    if done % step == 0 or done == total:
+                        print(f"[CAL] null dataset {done}/{total} done", flush=True)
+        else:
+            for done, wa in enumerate(worker_args, 1):
+                results.append(_run_resample(wa))
                 if done % step == 0 or done == total:
                     print(f"[CAL] null dataset {done}/{total} done", flush=True)
-    else:
-        for done, wa in enumerate(worker_args, 1):
-            results.append(_run_resample(wa))
-            if done % step == 0 or done == total:
-                print(f"[CAL] null dataset {done}/{total} done", flush=True)
-    results.sort(key=lambda x: x[0])
+        results.sort(key=lambda x: x[0])
 
-    min_exp = np.array([_min_or_one(pv_exp) for _, pv_exp, _ in results])
-    min_theta = np.array([_min_or_one(pv_theta) for _, _, pv_theta in results])
+        min_exp = np.array([_min_or_one(pv_exp) for _, pv_exp, _ in results])
+        min_theta = np.array([_min_or_one(pv_theta) for _, _, pv_theta in results])
 
-    # Persist the raw pool so the bootstrap can be rerun/replotted offline.
-    with (outdir / "pool_min_pvalues.csv").open("w") as f:
-        f.write("dataset,min_pval_exp,min_pval_theta\n")
-        for i in range(args.n_datasets):
-            f.write(f"{i},{min_exp[i]:.6e},{min_theta[i]:.6e}\n")
+        # Persist the raw pool so the bootstrap can be rerun/replotted offline.
+        with pool_csv.open("w") as f:
+            f.write("dataset,min_pval_exp,min_pval_theta\n")
+            for i in range(args.n_datasets):
+                f.write(f"{i},{min_exp[i]:.6e},{min_theta[i]:.6e}\n")
 
     # Step 2: bootstrap calibration/validation splits
     rng = np.random.default_rng(args.seed + 1)

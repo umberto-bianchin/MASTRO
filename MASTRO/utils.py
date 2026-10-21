@@ -84,6 +84,31 @@ def load_npy(path: Path):
 
 
 # =====================================================================
+# Westfall-Young threshold
+# =====================================================================
+def wy_threshold(minima, alpha):
+    """Westfall-Young threshold from the per-resample minimum p-values.
+
+    The largest minimum t with #{minima <= t} <= floor(alpha * m); a pattern is
+    rejected iff p <= t. Without ties this is the k-th smallest minimum,
+    k = floor(alpha * m). With ties the k-th smallest can sit inside a block of
+    equal minima (a pattern computed exactly recurs with the same p-value
+    across resamples), and rejecting at it would include the whole block,
+    e.g. FWER 0.09 at alpha = 0.05 on breast sigma=2; the threshold then
+    steps below the block. -inf (reject nothing) when no minimum qualifies.
+    """
+    s = np.sort(np.asarray(minima, dtype=float))
+    k = int(np.floor(alpha * len(s)))
+    if k == 0:
+        return float("-inf")
+    t = s[k - 1]
+    if np.searchsorted(s, t, side="right") <= k:
+        return float(t)
+    below = np.searchsorted(s, t, side="left")   # minima strictly below t
+    return float(s[below - 1]) if below > 0 else float("-inf")
+
+
+# =====================================================================
 # File I/O helpers
 # =====================================================================
 def read_floats(path):

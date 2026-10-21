@@ -47,6 +47,7 @@ from utils import (
     set_verbose,
     read_result_pairs,
     parse_items_from_pattern_line,
+    wy_threshold,
 )
 
 
@@ -626,20 +627,17 @@ def main():
             print(f"[WY] saved per-resample {label} p-values -> {jpath}")
 
     # ---- FWER: Westfall-Young corrected thresholds ----
-    # WY threshold at level alpha = alpha-th quantile of the resample minima
+    # WY threshold at level alpha = alpha-th quantile of the resample minima,
+    # stepped below any block of tied minima (utils.wy_threshold)
     # Reject H_P iff p_P <= threshold(alpha)
     # Because we use the *minimum* across all patterns in each resample, the
     # procedure controls FWER over the full family of tested trajectories.
-    min_exp_sorted = sorted(min_exp_vals)
-    min_theta_sorted = sorted(min_theta_vals)
-
     print(f"\n[WY] === FWER-corrected thresholds ({M} resamples) ===")
     thresholds_path = outdir / "wy_thresholds.txt"
     with thresholds_path.open("w") as f:
         for alpha in [0.01, 0.05, 0.1]:
-            idx = max(0, int(np.floor(alpha * M)) - 1)
-            t_exp = min_exp_sorted[idx]
-            t_theta = min_theta_sorted[idx]
+            t_exp = wy_threshold(min_exp_vals, alpha)
+            t_theta = wy_threshold(min_theta_vals, alpha)
             line = (f"alpha={alpha:.2f}  "
                     f"threshold_exp={t_exp:.6e}  "
                     f"threshold_theta={t_theta:.6e}")
