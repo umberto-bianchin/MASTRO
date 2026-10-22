@@ -67,6 +67,17 @@ def qq_points(ps, keep_bulk=3000):
     return exp[idx], obs[idx], n
 
 
+def distinct_on_screen(x, y, cells=3000):
+    """Indices of the points left after dropping those that fall on an
+    already drawn one: x, y in axes fractions, one point per cell of
+    1/cells of the axes (about 0.1 pt), far below the marker size. Keeps
+    the PDF light (the tail alone is ~10^5 vector markers) without
+    rasterizing it."""
+    cell = np.stack([np.floor(x * cells), np.floor(y * cells)], axis=1)
+    _, idx = np.unique(cell, axis=0, return_index=True)
+    return np.sort(idx)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -116,10 +127,7 @@ def main():
     ymax_all = max(pts[v][1].max() for v in variants)
     fig, ax = plt.subplots(figsize=(4.6, 4.6))
     ax.plot([0, top], [0, top], color="0.4", lw=0.8, ls="--")
-    for v in variants:
-        e, o, _ = pts[v]
-        name, c = STYLE.get(v, (v, None))
-        ax.plot(e, o, ".", ms=2.5, color=c, label=name)
+    ytr, ytop = (lambda y: y), ymax
 
     if ymax_all > ymax:
         # Piecewise y scale: linear up to ymax, then compressed so that the
@@ -137,6 +145,7 @@ def main():
 
         ax.set_yscale("function", functions=(fwd, inv))
         ax.set_ylim(0, hi)
+        ytr, ytop = fwd, fwd(hi)
         step = max(1, int(np.ceil(ymax / 6)))
         big = next(b for b in (5, 10, 20, 25, 50, 100, 200, 500)
                    if (ymax_all - ymax) / b <= 4)
@@ -156,6 +165,11 @@ def main():
         ax.set_ylim(0, ymax)
 
     ax.set_xlim(0, top * 1.03)
+    for v in variants:
+        e, o, _ = pts[v]
+        name, col = STYLE.get(v, (v, None))
+        keep = distinct_on_screen(e / (top * 1.03), ytr(o) / ytop)
+        ax.plot(e[keep], o[keep], ".", ms=2.5, color=col, label=name)
     ax.set_xlabel(r"expected $-\log_{10} p$", fontsize=8)
     ax.set_ylabel(r"observed $-\log_{10} p$", fontsize=8)
     if args.title:

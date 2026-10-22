@@ -23,6 +23,7 @@ STYLE = {
     "strict": ("no resolution (MAESTRI)", "C3", "o", "-"),
     "lenient": ("same node = both orders", "C0", "s", "-"),
     "majority": ("same node = majority order", "C1", "v", "-"),
+    "observed": ("same node resolved, then tested", "C2", "^", "-"),
 }
 
 
@@ -104,7 +105,7 @@ def main():
     rows = load(d / "resolution.csv")
     ax = axes[1, 1]
     for pat, ls, tag in (("A->-B", "-", "A->B"), ("B->-A", ":", "B->A")):
-        for v in ("strict", "lenient", "majority"):
+        for v in ("strict", "lenient", "majority", "observed"):
             name, c, m, _ = STYLE[v]
             xs, ps = series(rows, v, pat, "pval_exp")
             ax.plot(xs, ps, color=c, marker=m, ls=ls, ms=4, label=f"{name}: {tag}")

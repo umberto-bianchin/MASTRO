@@ -32,9 +32,11 @@ Toys (--toy):
   resolution  one tree per patient; 2 patients A->B, 1 patient B->A, m
               patients with A and B in the same node (AB->C or C->AB). Strict
               matching (Multi-MASTRO) against two rules that resolve the
-              same-node pair: 'lenient' (same node supports both orders) and
-              'majority' (resolved towards the cohort's majority order, the
-              rule recomputed on every null dataset). Exact computation, does
+              same-node pair: 'lenient' (same node supports both orders),
+              'majority' (resolved towards the cohort's majority order), both
+              recomputed on every null dataset, and 'observed' (the observed
+              same-node trees are resolved towards the tested order once, and
+              the null relabels the resolved trees). Exact computation, does
               not call the significance script.
 
 Run from the MASTRO/ code directory:
@@ -271,6 +273,12 @@ def statistic(nf, nr, ns, rule, direction):
     return own + (ns if own > other else 0)
 
 
+def resolve(items, direction):
+    """The tree with its same-node pair A, B turned into the tested order."""
+    edge = "A->-B" if direction == "f" else "B->-A"
+    return " ".join(edge if it == "A-?-B" else it for it in items.split())
+
+
 def exact_null(laws):
     """Joint law of (#f, #r, #s) over independent patients, as a dict."""
     dist = {(0, 0, 0): 1.0}
@@ -290,16 +298,76 @@ def toy_resolution(m_list=(0, 2, 5, 10, 20, 30, 40, 60)):
         trees = [T_AB] * 2 + [T_BA] + [T_ABC if j % 2 == 0 else T_CAB for j in range(m)]
         obs = Counter(pair_state(t) for t in trees)
         null = exact_null([state_law(t) for t in trees])
-        for rule in ("strict", "lenient", "majority"):
+        # 'observed': the same-node trees count for the tested order, then the
+        # null relabels those trees with the order already written in, so a
+        # null tree supports the pattern only through a real edge
+        null_res = {d: exact_null([state_law(resolve(t, d)) for t in trees])
+                    for d in ("f", "r")}
+        for rule in ("strict", "lenient", "majority", "observed"):
             for d, name in (("f", "A->-B"), ("r", "B->-A")):
-                s_obs = statistic(obs["f"], obs["r"], obs["s"], rule, d)
-                p = sum(pr for (f, r, s), pr in null.items()
-                        if statistic(f, r, s, rule, d) >= s_obs)
+                if rule == "observed":
+                    s_obs = statistic(obs["f"], obs["r"], obs["s"], "lenient", d)
+                    dist, null_rule = null_res[d], "strict"
+                else:
+                    s_obs = statistic(obs["f"], obs["r"], obs["s"], rule, d)
+                    dist, null_rule = null, rule
+                p = sum(pr for (f, r, s), pr in dist.items()
+                        if statistic(f, r, s, null_rule, d) >= s_obs)
                 rows.append({"toy": "resolution", "x": m, "variant": rule,
                              "pattern": name, "theta": "", "s_exp": s_obs,
                              "s_theta": "", "pval_exp": p, "pval_theta": ""})
                 print(f"[resolution] m={m:<3} {rule:8s} {name}  support={s_obs:3d}  p={p:.3e}",
                       flush=True)
+    return rows
+
+
+def resolution_null(m_list=(0, 2, 5, 10, 20, 30, 40, 60), n_rep=10000,
+                    alphas=(0.01, 0.05), seed=0):
+    """Type I error of each rule for A->B on cohorts that are null by
+    construction: every tree of the resolution toy relabelled at random.
+
+    'strict', 'lenient' and 'majority' score the relabelled cohort against the
+    null of their own statistic. 'observed' resolves the trees that the
+    relabelled cohort holds in one node towards A->B and computes the null on
+    those resolved trees, so its null depends on the data."""
+    rng = np.random.default_rng(seed)
+    labs = ["A", "B", "C"]
+    perms = list(itertools.permutations(labs))
+    rows = []
+    for m in m_list:
+        trees = [T_AB] * 2 + [T_BA] + [T_ABC if j % 2 == 0 else T_CAB for j in range(m)]
+        laws = [state_law(t) for t in trees]
+        null = exact_null(laws)
+        tail, q_res = {}, {}
+        rejected = Counter()
+        for _ in range(n_rep):
+            relab = [relabel(t, dict(zip(labs, perms[rng.integers(6)]))) for t in trees]
+            st = Counter(pair_state(t) for t in relab)
+            key = (st["f"], st["r"], st["s"])
+            for rule in ("strict", "lenient", "majority"):
+                if (rule, key) not in tail:
+                    s_obs = statistic(*key, rule, "f")
+                    tail[rule, key] = sum(pr for k, pr in null.items()
+                                          if statistic(*k, rule, "f") >= s_obs)
+                for a in alphas:
+                    rejected[rule, a] += tail[rule, key] <= a
+            # 'observed': strict count of A->B over the resolved trees
+            dist = np.array([1.0])
+            for t in relab:
+                if t not in q_res:
+                    q_res[t] = state_law(resolve(t, "f")).get("f", 0.0)
+                dist = np.convolve(dist, [1 - q_res[t], q_res[t]])
+            p = dist[statistic(*key, "lenient", "f"):].sum()
+            for a in alphas:
+                rejected["observed", a] += p <= a
+        for rule in ("strict", "lenient", "majority", "observed"):
+            for a in alphas:
+                rate = rejected[rule, a] / n_rep
+                rows.append({"m": m, "variant": rule, "alpha": a,
+                             "rejection_rate": rate, "n_rep": n_rep})
+            print(f"[resolution_null] m={m:<3} {rule:8s} "
+                  + "  ".join(f"P(p<={a})={rejected[rule, a] / n_rep:.3f}"
+                              for a in alphas), flush=True)
     return rows
 
 
@@ -333,6 +401,13 @@ def main():
                 wr.writeheader()
                 wr.writerows(rows)
             print(f"[out] {out / (name + '.csv')}")
+            if name == "resolution":
+                rows = resolution_null()
+                with (out / "resolution_null.csv").open("w", newline="") as f:
+                    wr = csv.DictWriter(f, fieldnames=list(rows[0]))
+                    wr.writeheader()
+                    wr.writerows(rows)
+                print(f"[out] {out / 'resolution_null.csv'}")
 
 
 if __name__ == "__main__":
