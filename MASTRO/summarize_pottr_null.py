@@ -21,6 +21,11 @@ these are the corrected false discoveries. The expected-support threshold
 covers every trajectory with expected support >= sigma; the theta threshold
 covers the theta-maximal family only and is reported for reference.
 
+--wy_file gives one thresholds file for every seed instead. That is exact, not
+an approximation: the 'perm' null of a null cohort is the per-patient
+relabelling of a per-patient relabelling, again a uniform relabelling of the
+real cohort, so all seeds (and the real cohort) share one null distribution.
+
 Output: one row per seed, then the fraction of seeds with at least one
 discovery at each alpha (a FWER-like rate) for each test.
 
@@ -64,6 +69,9 @@ def main():
     ap.add_argument("--wy_name", default=None,
                     help="WY output folder inside each seed dir "
                          "(e.g. wy_sigma2_theta1.0); adds the corrected counts")
+    ap.add_argument("--wy_file", default=None,
+                    help="one wy_thresholds.txt shared by every seed "
+                         "(overrides --wy_name)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -79,8 +87,9 @@ def main():
             r[f"{test}_min_p"] = min(pv) if pv else ""
             for a in ALPHAS:
                 r[f"{test}_n_below_{a}"] = sum(p <= a for p in pv)
-        if args.wy_name:
-            wy_path = Path(path).parent / args.wy_name / "wy_thresholds.txt"
+        if args.wy_name or args.wy_file:
+            wy_path = (Path(args.wy_file) if args.wy_file else
+                       Path(path).parent / args.wy_name / "wy_thresholds.txt")
             wy = read_wy(wy_path) if wy_path.exists() else {}
             for a in ALPHAS:
                 if a not in wy:

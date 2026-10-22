@@ -37,12 +37,24 @@ CORES=${CORES:-20}
 POTTR_SIG_MAX_NODES=${POTTR_SIG_MAX_NODES:-6}
 THETA=${THETA:-1.0}
 NULL=${NULL:-perm}
+SUMMARY=${SUMMARY:-1}                        # 0 in array jobs: summarize after all seeds
 
 # ---- (A) the real cohort, built once ----------------------------------------
+# Deterministic (seed 0). The lock keeps concurrent array jobs from rebuilding
+# it on top of each other; a job that finds it already built skips the step.
 echo "=== (A) prepare the matched real cohort ==="
-python3 breastcancer_to_pottr.py \
-  --npy "$NPY" --out "${OUT_BASE}/real/dags" --ensemble_out "${OUT_BASE}/real/inputs" \
-  --max_trees "$MAX_TREES" --seed 0
+mkdir -p "$OUT_BASE"
+(
+  flock 9
+  if [ -f "${OUT_BASE}/real/inputs/graphs_all.txt" ] \
+     && [ -n "$(ls "${OUT_BASE}/real/dags" 2>/dev/null)" ]; then
+    echo "[SKIP] real cohort already built"
+  else
+    python3 breastcancer_to_pottr.py \
+      --npy "$NPY" --out "${OUT_BASE}/real/dags" --ensemble_out "${OUT_BASE}/real/inputs" \
+      --max_trees "$MAX_TREES" --seed 0
+  fi
+) 9>"${OUT_BASE}/.real.lock"
 
 if [ -n "$POTTR_ENV" ] && command -v conda >/dev/null 2>&1; then
   # shellcheck disable=SC1091
@@ -99,6 +111,7 @@ for SEED in $SEEDS; do
 done
 
 # ---- (D) false discoveries per seed -----------------------------------------
+[ "$SUMMARY" = 1 ] || exit 0
 echo "=== (D) summary ==="
 python3 summarize_pottr_null.py --csv "${OUT_BASE}"/seed*/significance.csv \
   --out "${OUT_BASE}/summary.csv"

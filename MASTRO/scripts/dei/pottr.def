@@ -1,0 +1,32 @@
+Bootstrap: docker
+From: ubuntu:24.04
+
+# mastro.def plus what POTTR needs: scipy and gurobipy. The Gurobi license is
+# NOT in the image: an Academic WLS license (gurobi.lic with WLSACCESSID,
+# WLSSECRET, LICENSEID) is read at run time through GRB_LICENSE_FILE and
+# validated online, so it works on any compute node.
+#
+# Build on a compute node (apptainer is not installed on the login node):
+#   sinteractive --time=01:00:00 --mem 8G
+#   apptainer build ~/images/pottr.sif ~/MASTRO/MASTRO/scripts/dei/pottr.def
+
+%post
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        build-essential perl \
+        python3 python-is-python3 python3-pip \
+        python3-numpy python3-pandas python3-matplotlib python3-networkx \
+        python3-scipy python3-tqdm python3-filelock
+    pip3 install --no-cache-dir --break-system-packages gurobipy==12.0.3
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+
+%environment
+    export LC_ALL=C.UTF-8
+    export MPLBACKEND=Agg
+
+%test
+    python3 -c "import numpy, pandas, scipy, networkx, filelock, gurobipy"
+    perl -v >/dev/null
+    gcc --version >/dev/null
