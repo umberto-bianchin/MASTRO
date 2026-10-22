@@ -14,8 +14,10 @@
 # inside ~/images/pottr.sif (built from scripts/dei/pottr.def). The array index
 # is the seed; CORES (Gurobi threads, MASTRO jobs) follows --cpus-per-task.
 #
-# Needs: POTTR cloned next to the repo (~/POTTR), and an Academic WLS Gurobi
-# license at ~/gurobi.lic (or GRB_LICENSE_FILE pointing to it).
+# Needs: POTTR cloned next to the repo (~/POTTR), and a Gurobi license: one
+# named academic license per node in ~/gurobi/<node>.lic (restrict the array to
+# those nodes), else an Academic WLS one at ~/gurobi.lic (2 sessions at a time:
+# submit with --array=...%2).
 #
 # Submit from the code directory (<repo>/MASTRO):
 #   cd ~/MASTRO/MASTRO
@@ -36,6 +38,11 @@ cd "$SLURM_SUBMIT_DIR"
 [ -f scripts/run_pottr_null_breastcancer.sh ] || { echo "submit from <repo>/MASTRO" >&2; exit 1; }
 [ -f "$SIF" ] || { echo "image $SIF not found" >&2; exit 1; }
 
+# A named academic license is bound to one node: ~/gurobi/<node>.lic when it
+# exists. The WLS fallback allows only 2 concurrent sessions ("Too many sessions").
+if [ -z "${GRB_LICENSE_FILE:-}" ] && [ -f "$HOME/gurobi/$(hostname -s).lic" ]; then
+  export GRB_LICENSE_FILE=$HOME/gurobi/$(hostname -s).lic
+fi
 export GRB_LICENSE_FILE=${GRB_LICENSE_FILE:-$HOME/gurobi.lic}
 [ -f "$GRB_LICENSE_FILE" ] || { echo "Gurobi license $GRB_LICENSE_FILE not found" >&2; exit 1; }
 
@@ -44,5 +51,5 @@ export K_LIST=${K_LIST:-"2 3 5 8 12 17 22 29"}   # the seed-1 sweep
 export CORES=${CORES:-$SLURM_CPUS_PER_TASK}
 export POTTR_ENV=""
 export SUMMARY=0
-echo "node=$(hostname) seed=$SEEDS cpus=$SLURM_CPUS_PER_TASK K_LIST=$K_LIST"
+echo "node=$(hostname) seed=$SEEDS cpus=$SLURM_CPUS_PER_TASK K_LIST=$K_LIST license=$GRB_LICENSE_FILE"
 srun apptainer exec "$SIF" bash scripts/run_pottr_null_breastcancer.sh
