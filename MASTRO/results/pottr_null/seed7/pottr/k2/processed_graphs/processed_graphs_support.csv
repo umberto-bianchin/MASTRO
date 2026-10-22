@@ -1,0 +1,2 @@
+File Index,Support,Supporting Graphs,Edges
+1,3,P816-0 P990-0 P990-1,0->-PTEN PTEN->-ARID2 EPHA5->-TP53 ARID2->-EPHA5 TP53->-ROS1

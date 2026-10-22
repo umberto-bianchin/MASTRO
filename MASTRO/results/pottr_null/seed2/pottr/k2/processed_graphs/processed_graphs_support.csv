@@ -1,0 +1,2 @@
+File Index,Support,Supporting Graphs,Edges
+1,3,P386-0 P386-1 P536-0,PIK3CA->-MED12 PTCH1->-KMT2A KMT2A->-MGA MED12->-PTCH1 0->-PIK3CA
