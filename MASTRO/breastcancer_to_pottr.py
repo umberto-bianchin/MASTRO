@@ -60,15 +60,14 @@ from utils import (
 
 
 def _tree_key(tr, drop_gl):
-    """Canonical hashable key for a tree = its set of directed edges."""
+    """Canonical hashable key for a tree = its set of pairwise-relation items."""
     edges = extract_edges_from_tree(tr)
-    if drop_gl:
-        edges = [(u, v) for u, v in edges if u != "GL" and v != "GL"]
-    return frozenset(edges)
+    return frozenset(tree_edges_to_transaction_items(edges, drop_gl=drop_gl))
 
 
 def _dedup_trees(trees, drop_gl):
-    """Drop trees with an identical edge set, keeping first occurrence order."""
+    """Drop trees with an identical pairwise-relation set, and trees with no
+    pair at all (fewer than two mutations), keeping first occurrence order."""
     seen = set()
     out = []
     for tr in trees:
@@ -127,7 +126,13 @@ def main():
     # ---- select cohort ONCE: dedup -> cap -> eligibility -> subset ----------
     selected = []  # list of (orig_patient_idx, [trees])
     n_dropped_above = 0
+    n_pairless_trees = 0
+    n_pairless_patients = 0
     for i, tlist in enumerate(data):
+        n_pairless = sum(1 for tr in tlist if not _tree_key(tr, drop_gl))
+        n_pairless_trees += n_pairless
+        if len(tlist) > 0 and n_pairless == len(tlist):
+            n_pairless_patients += 1
         trees = _dedup_trees(list(tlist), drop_gl)
         if len(trees) < min_trees:
             continue
@@ -173,6 +178,8 @@ def main():
 
     tc = np.array(tree_counts) if tree_counts else np.array([0])
     print(f"[bc->POTTR] patients selected = {len(selected)}, tree files = {n_files}")
+    print(f"[bc->POTTR] dropped for having no mutation pair (< 2 mutations): "
+          f"{n_pairless_trees} trees, {n_pairless_patients} patients left with no tree")
     if args.drop_above:
         print(f"[bc->POTTR] dropped for > {args.drop_above} distinct trees: "
               f"{n_dropped_above} patients")

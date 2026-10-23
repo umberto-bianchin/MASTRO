@@ -19,7 +19,7 @@ PAR=${PAR:-4}
 THETA_LIST=${THETA_LIST:-"0.5 1.0"}
 NULL=${NULL:-perm}
 N_PATIENTS=${N_PATIENTS:-60}
-MTREES=${MTREES:-6}
+MTREES=${MTREES:-10}
 K=${K:-4}
 N_LIST=${N_LIST:-2,3,5,10,20,30}
 F_LIST=${F_LIST:-0.2,0.4,0.6,0.8,1.0}
@@ -41,7 +41,7 @@ for THETA in $THETA_LIST; do
     --theta "$THETA" --sigma "$SIGMA" --alpha "$ALPHA" \
     --null "$NULL" --test both \
     --n_trials "$N_TRIALS" --wy_M "$WY_M" \
-    --mc_cutoff 8 --mc_samples 2000 --par "$PAR" \
+    --mc_cutoff 10 --mc_samples 2000 --par "$PAR" \
     --outdir "${OUT_BASE}/implant_theta${THETA}"
 done
 echo "=== power experiment complete -> ${OUT_BASE} ==="

@@ -271,8 +271,13 @@ def compute_phi_i(rel_tensor, weights_i, pattern_items, alterations,
     Returns (phi, used_mc) where *used_mc* is True when the patient-level
     distribution was estimated by Monte-Carlo sampling rather than exact
     enumeration. Callers use this flag to apply the add-one Monte-Carlo
-    correction (B*p + 1)/(B + 1) to the aggregated p-value, which keeps an
-    MC-estimated tail valid (never exactly 0) and slightly conservative.
+    correction (B*p + 1)/(B + 1) to the aggregated p-value. Adding one to the
+    numerator makes it always >= p and never exactly 0, so it is conservative,
+    but it is biased upwards, not unbiased. The classical validity guarantee of
+    the add-one estimator holds when the full statistic is compared with B null
+    draws of the full statistic; here the p-value is the tail of a convolution
+    of per-patient Monte-Carlo histograms, so the formula alone does not
+    guarantee validity.
     """
     M, n_alt, _ = rel_tensor.shape
     if M == 0 or n_alt == 0:
@@ -321,14 +326,18 @@ def compute_phi_i(rel_tensor, weights_i, pattern_items, alterations,
         for J_set, cnt in counter.items():
             for j in J_set:
                 q[j] += cnt / float(B_total)
-        phi = {0: 1.0}
+        # DP on the exact weighted sum, rounded to the L-grid ONCE per patient,
+        # the same quantisation as y_obs and as the shared 'perm' branch
+        sums = {0.0: 1.0}
         for j in range(M):
-            step = int(round(L * weights_i[j]))
-            new_phi = defaultdict(float)
-            for e, p in phi.items():
-                new_phi[e] += p * (1.0 - q[j])
-                new_phi[e + step] += p * q[j]
-            phi = new_phi
+            new_sums = defaultdict(float)
+            for v, p in sums.items():
+                new_sums[v] += p * (1.0 - q[j])
+                new_sums[round(v + weights_i[j], 12)] += p * q[j]
+            sums = new_sums
+        phi = defaultdict(float)
+        for v, p in sums.items():
+            phi[int(round(L * v))] += p
         return dict(phi), used_mc
     phi = defaultdict(float)
     for J_set, cnt in counter.items():
@@ -531,9 +540,13 @@ def _process_trajectory(task):
 
     # Monte-Carlo p-value correction (add-one numerator). When any patient used
     # the MC fallback the aggregated null tail is estimated from ~B samples, so
-    # we report the unbiased estimator (B*p + 1)/(B + 1) rather than the raw
-    # tail. Adding 1 to the numerator keeps the p-value valid (never exactly 0)
-    # and slightly conservative, and it reduces to the exact tail as B -> inf;
+    # we report (B*p + 1)/(B + 1) rather than the raw tail. Adding 1 to the
+    # numerator makes it always >= p and never exactly 0, so it is conservative;
+    # it is biased upwards, not unbiased. The classical validity guarantee of
+    # the add-one estimator needs the full statistic compared with B null draws
+    # of the full statistic, whereas here the tail comes from a convolution of
+    # per-patient MC histograms, so the formula alone does not guarantee
+    # validity. It reduces to the exact tail as B -> inf;
     # when p == 0 it collapses to 1/(B + 1), matching the previous floor. Exact
     # (fully enumerated) trajectories keep their true, possibly tiny, p-value.
     B = G["mc_samples"]
@@ -618,6 +631,8 @@ def main():
                          "(e.g. POTTR trajectories): only the pairwise relations "
                          "actually present in the pattern constrain the null.")
     args = ap.parse_args()
+    if bool(args.weights) != bool(args.owner):
+        ap.error("--weights and --owner must be given together")
 
     drop_gl = not args.keep_gl
     input_path = Path(args.input)

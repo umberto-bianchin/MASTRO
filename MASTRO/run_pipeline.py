@@ -83,14 +83,18 @@ def run_pipeline(graphs_txt: Path, sigma: float, lcmdir: Path, workdir: Path, ta
         else:
             run_lcm(lcmdir, file_graphs_ids, sigma, output_lcm, log_path, weights_txt=None)
 
+        tmp_converted = results_converted.with_name(results_converted.name + ".tmp")
         run_cmd([PYTHON, str(SCRIPT_DIR / "convert_results.py"),
-                 "-m", str(table_file_ids), "-i", str(output_lcm), "-o", str(results_converted)])
+                 "-m", str(table_file_ids), "-i", str(output_lcm), "-o", str(tmp_converted)])
+        tmp_converted.replace(results_converted)
 
     if results_filtered.exists():
         print(f"[SKIP] {results_filtered.name} already exists - skipping filter_results")
     else:
+        tmp_filtered = results_filtered.with_name(results_filtered.name + ".tmp")
         run_cmd([PYTHON, str(SCRIPT_DIR / "filter_results.py"),
-                 "-i", str(results_converted), "-o", str(results_filtered)])
+                 "-i", str(results_converted), "-o", str(tmp_filtered)])
+        tmp_filtered.replace(results_filtered)
 
     return results_filtered
 
@@ -315,6 +319,10 @@ def main():
                     help="Parallel workers for per-patient phi_i computation "
                          "in significance testing (default 1 = sequential)")
     args = ap.parse_args()
+    if args.keep_gl and args.significance:
+        ap.error("--keep_gl cannot be combined with --significance: the significance "
+                 "test drops the germline GL, and the 'perm' null would relabel GL "
+                 "as an alteration")
 
     lcmdir = Path(args.lcmdir).resolve()
     drop_gl = not args.keep_gl
@@ -353,7 +361,7 @@ def main():
         owner_sampled_txt = inputs_dir / "owner_sampled.txt"
         with weights_sampled_txt.open("w") as fw, owner_sampled_txt.open("w") as fo:
             for i, tlist in enumerate(patients_trees):
-                if not tlist:
+                if len(tlist) == 0:
                     continue
                 fw.write("1.0\n")
                 fo.write(f"{i}\n")
@@ -363,7 +371,7 @@ def main():
         n = len(patients_trees)
         sampled_data = np.empty(n, dtype=object)
         for i, tlist in enumerate(patients_trees):
-            if not tlist:
+            if len(tlist) == 0:
                 sampled_data[i] = np.empty((0, 2), dtype=object)
                 continue
             j = int(rng_sample.integers(0, len(tlist)))

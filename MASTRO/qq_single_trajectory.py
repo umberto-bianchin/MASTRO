@@ -16,9 +16,9 @@ alterations, and the patient matches in every tree that holds u->-v. Hence:
 The variants, as in ablation_toys.VARIANTS:
   maestri      statistic sum_i round(L c_i / M_i), null: one pair per patient
   count_trees  statistic sum_i c_i,                null: one pair per patient
-  perm_tree    statistic of maestri, null: an independent pair per tree. Each
-               tree weighs round(L / M_i) on the grid, as compute_significance_
-               ensemble.py does (a tree of a patient with M_i > 2L weighs 0)
+  perm_tree    statistic of maestri, null: an independent pair per tree. The
+               number k of matching trees is put on the grid once per patient,
+               round(L k / M_i), as compute_significance_ensemble.py does
   trees_as_patients  statistic of count_trees, null: every tree is a patient
                relabelled over its own alterations
 c_i is the number of trees of patient i that match, L = 1000 the grid of the
@@ -171,7 +171,13 @@ def main():
         real_c += int(c_real)
         laws["maestri"].append(law_of(w))
         laws["count_trees"].append(law_of(counts))
-        laws["perm_tree"].append(bernoulli_sum(q_pat, int(round(L / M))))
+        # number of matching trees, rounded to the L-grid ONCE per patient as
+        # w and real_w are (and as compute_significance_ensemble.py does)
+        pb = bernoulli_sum(q_pat, 1)
+        law_pt = np.zeros(L + 1)
+        for k_match, p in enumerate(pb):
+            law_pt[int(round(L * k_match / M))] += p
+        laws["perm_tree"].append(law_pt)
         laws["trees_as_patients"].append(bernoulli_sum(q_own, 1))
     tails = {v: tail(convolve_all(laws[v])) for v in VARIANTS}
     stat_of = {"maestri": "w", "perm_tree": "w", "count_trees": "c", "trees_as_patients": "c"}

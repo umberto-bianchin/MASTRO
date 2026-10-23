@@ -102,7 +102,7 @@ def build_cohort(rng, n_patients, M, traj, bg_labels, carriers, f):
     for i in range(n_patients):
         trees = []
         if i in carriers:
-            n_perfect = int(np.ceil(f * M))
+            n_perfect = int(round(f * M))
             for j in range(M):
                 if j < n_perfect:
                     trees.append(_perfect_tree(rng, traj, bg_labels))
@@ -257,7 +257,7 @@ def calibrate_threshold(null_dir, rng, n_patients, M, bg_labels, traj, sigma, th
 def main():
     ap = argparse.ArgumentParser(description="Ensemble implant / power experiment")
     ap.add_argument("--n_patients", type=int, default=60)
-    ap.add_argument("--M", type=int, default=6, help="trees per patient")
+    ap.add_argument("--M", type=int, default=10, help="trees per patient")
     ap.add_argument("--k", type=int, default=4, help="implanted trajectory length")
     ap.add_argument("--n_background", type=int, default=8)
     ap.add_argument("--N_list", default="2,3,5,10,20,30", help="carrier counts")
@@ -293,6 +293,11 @@ def main():
     traj = [f"X{i}" for i in range(args.k)]
     N_list = [int(x) for x in args.N_list.split(",") if x.strip()]
     f_list = [float(x) for x in args.f_list.split(",") if x.strip()]
+    for f in f_list:
+        if abs(f * args.M - round(f * args.M)) > 1e-9:
+            ap.error(f"f={f} with M={args.M} gives f*M={f * args.M:g}, not an "
+                     f"integer: the realised fraction of perfect trees would "
+                     f"differ from f")
 
     print(f"[POW] n_patients={args.n_patients} M={args.M} k={args.k} "
           f"theta={args.theta} sigma={args.sigma} alpha={args.alpha}")
@@ -339,23 +344,36 @@ def main():
             if (N, f) in done:
                 print(f"[POW] N={N} f={f:.2f}  [SKIP] already done")
                 continue
-            n_exp = n_theta = 0
+            # The cohorts are drawn here, in trial order, from the one shared
+            # rng, so the random stream (and every result) is the same with or
+            # without --par; only mining + scoring run in parallel.
+            tasks = []
             for t in range(args.n_trials):
                 carriers = rng.choice(args.n_patients, size=N, replace=False)
                 data = build_cohort(rng, args.n_patients, args.M, traj,
                                     bg_labels, carriers, f)
-                trial_dir = outdir / f"trials/N{N}_f{f}/t{t}"
-                rec_e, rec_t = run_trial(
-                    trial_dir, data, traj, args.sigma, args.theta, lcmdir,
-                    delta_exp, delta_theta, args.null, args.mc_cutoff,
-                    args.mc_samples, args.seed + t, want_exp, want_theta)
-                n_exp += int(rec_e)
-                n_theta += int(rec_t)
-                # keep disk small
-                _cleanup(trial_dir)
-                if (t + 1) % step == 0:
-                    print(f"[POW]   N={N} f={f:.2f}  trial {t+1}/{args.n_trials}",
-                          flush=True)
+                tasks.append((outdir / f"trials/N{N}_f{f}/t{t}", data, traj,
+                              args.sigma, args.theta, lcmdir, delta_exp,
+                              delta_theta, args.null, args.mc_cutoff,
+                              args.mc_samples, args.seed + t, want_exp, want_theta))
+            n_exp = n_theta = 0
+            if args.par > 1:
+                with Pool(args.par) as pool:
+                    flags = pool.imap_unordered(_trial_worker, tasks)
+                    for done_t, (rec_e, rec_t) in enumerate(flags, 1):
+                        n_exp += int(rec_e)
+                        n_theta += int(rec_t)
+                        if done_t % step == 0:
+                            print(f"[POW]   N={N} f={f:.2f}  trial {done_t}/{args.n_trials}",
+                                  flush=True)
+            else:
+                for t, task in enumerate(tasks):
+                    rec_e, rec_t = _trial_worker(task)
+                    n_exp += int(rec_e)
+                    n_theta += int(rec_t)
+                    if (t + 1) % step == 0:
+                        print(f"[POW]   N={N} f={f:.2f}  trial {t+1}/{args.n_trials}",
+                              flush=True)
             if want_exp:
                 rows.append({"N": N, "f": f, "test": "exp",
                              "recall": f"{n_exp / args.n_trials:.4f}"})
@@ -369,6 +387,14 @@ def main():
                   f"recall_theta={n_theta/args.n_trials:.2f}")
 
     print(f"[POW] written -> {out_csv}")
+
+
+def _trial_worker(task):
+    """run_trial on one prepared cohort, then delete its scratch directory."""
+    rec = run_trial(*task)
+    # keep disk small
+    _cleanup(task[0])
+    return rec
 
 
 def _cleanup(path):

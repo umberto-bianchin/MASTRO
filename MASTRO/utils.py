@@ -263,7 +263,7 @@ def build_inputs(patients_trees, outdir: Path, seed: int, drop_gl=True):
     # One random tree per patient: the single-tree baseline
     with graphs_sampled.open("w") as fs:
         for i, tlist in enumerate(patients_trees):
-            if not tlist:
+            if len(tlist) == 0:
                 continue
             j = int(rng.integers(0, len(tlist)))
             tr = tlist[j]
@@ -469,8 +469,12 @@ def load_weights_and_owner(weights_path, owner_path):
     Returns (weights, owner0, n_patients, K) where:
       - weights : list[float] of transaction weights
       - owner0  : list[int] of 0-based patient IDs per transaction
-      - n_patients : number of distinct patients
+      - n_patients : max(owner0) + 1 (patients with no transaction count too)
       - K       : total number of transactions
+
+    Owner ids are always read as 0-based patient indices, the format every
+    writer in this repo emits; no 1-based shift is attempted, so a file whose
+    patient 0 has no transaction is read correctly. Negative ids are rejected.
     """
     weights = read_floats(weights_path)
     owner = read_ints(owner_path)
@@ -481,13 +485,11 @@ def load_weights_and_owner(weights_path, owner_path):
     if K == 0:
         raise ValueError("Empty weights/owner files")
 
-    # Normalize to 0-based
-    shift = 1 if min(owner) == 1 else 0
-    owner0 = [x - shift for x in owner]
-    if min(owner0) != 0:
+    if min(owner) < 0:
         raise ValueError(
-            "Owner ids must be 0-based or 1-based contiguous starting at 0/1"
+            f"Owner ids must be 0-based patient indices (>= 0), found {min(owner)}"
         )
+    owner0 = list(owner)
 
     n_patients = max(owner0) + 1
     return weights, owner0, n_patients, K
