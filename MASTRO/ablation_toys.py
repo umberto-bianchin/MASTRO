@@ -20,17 +20,18 @@ code used in the experiments:
 The theta test is reported for the weighted variants only: with weight 1 per
 tree pi_i counts trees and theta loses its meaning.
 
-Toys (--toy):
+Toys (--toy), every tree on A and B only unless stated:
   shape       100 A->B trees spread over a carriers with 100/a trees each,
-              100 patients in total. Does it matter whether 1 patient or 100
+              100 patients in total, the others with A and B unordered. Does it matter whether 1 patient or 100
               patients hold the evidence?
   competition 1 patient with M trees A->B, 100 patients with one tree B->A.
   duplication every tree of a patient copied M times: identical evidence,
               the p-value must not move with M.
   ambiguity   every patient holds every order of its alterations (A->B and
               B->A, or the 6 chains of A, B, C): no information on the order.
-  resolution  one tree per patient; 2 patients A->B, 1 patient B->A, m
-              patients with A and B in the same node (AB->C or C->AB). Strict
+  resolution  one tree per patient; 2 patients A->B, 1 patient B->A (trees
+              on A and B only), m patients with A and B in the same node
+              (AB->C or C->AB). Strict
               matching (Multi-MASTRO) against two rules that resolve the
               same-node pair: 'lenient' (same node supports both orders),
               'majority' (resolved towards the cohort's majority order), both
@@ -46,6 +47,7 @@ Run from the MASTRO/ code directory:
 import argparse
 import csv
 import itertools
+import re
 import subprocess
 import sys
 import tempfile
@@ -108,12 +110,12 @@ def chain_tree(order):
     return tree_items([{x} for x in order], [-1] + list(range(len(order) - 1)))
 
 
-FILLERS = ["F1", "F2", "F3", "F4"]
-# 6 alterations, one ancestor pair: a fixed ordered pair is the ancestor pair
-# of a random relabelling with probability q = 1/30
-AB = pair_tree("A", "B", FILLERS)
-BA = pair_tree("B", "A", FILLERS)
-NOISE = pair_tree("F1", "F2", ["A", "B", "F3", "F4"])
+# Two alterations per tree. A random relabelling turns A->B into A->B or B->A
+# with probability 1/2 each; NOISE holds A and B on different branches, which
+# no relabelling orders, so it never supports either order
+AB = pair_tree("A", "B", [])
+BA = pair_tree("B", "A", [])
+NOISE = tree_items([{"A"}, {"B"}], [-1, -1])
 
 
 # =====================================================================
@@ -220,11 +222,13 @@ def toy_ambiguity(tmp, n_list=(1, 2, 5, 10, 20, 50, 100)):
 # =====================================================================
 # Resolution toy (exact, one tree per patient)
 # =====================================================================
-# Patient trees on {A, B, C}; under the per-patient permutation each tree puts
-# the pair (A, B) in one of three states: 'f' A->B, 'r' B->A, 's' same node,
-# or 'n' none of them.
-T_AB = tree_items([{"A"}, {"B"}, {"C"}], [-1, 0, -1])
-T_BA = tree_items([{"B"}, {"A"}, {"C"}], [-1, 0, -1])
+# The ordered patients carry only A and B; the same-node patients carry
+# {A, B, C}, C making the node pair part of a tree. Under the per-patient
+# permutation (of the patient's own alterations) each tree puts the pair (A, B)
+# in one of three states: 'f' A->B, 'r' B->A, 's' same node, or 'n' none of
+# them.
+T_AB = tree_items([{"A"}, {"B"}], [-1, 0])
+T_BA = tree_items([{"B"}, {"A"}], [-1, 0])
 T_ABC = tree_items([{"A", "B"}, {"C"}], [-1, 0])
 T_CAB = tree_items([{"C"}, {"A", "B"}], [-1, 0])
 
@@ -254,12 +258,19 @@ def relabel(items, sigma):
     return " ".join(out)
 
 
+def labels(items):
+    """The alterations of a tree, sorted."""
+    return sorted({x for it in items.split()
+                   for x in re.split(r"->-|-\?-|-/-", it)})
+
+
 def state_law(items):
-    """Null law of the (A, B) state of a tree under a uniform relabelling."""
-    labs = ["A", "B", "C"]
-    c = Counter(pair_state(relabel(items, dict(zip(labs, perm))))
-                for perm in itertools.permutations(labs))
-    return {k: v / 6.0 for k, v in c.items()}
+    """Null law of the (A, B) state of a tree under a uniform relabelling of
+    its own alterations."""
+    labs = labels(items)
+    perms = list(itertools.permutations(labs))
+    c = Counter(pair_state(relabel(items, dict(zip(labs, perm)))) for perm in perms)
+    return {k: v / len(perms) for k, v in c.items()}
 
 
 def statistic(nf, nr, ns, rule, direction):
@@ -331,8 +342,6 @@ def resolution_null(m_list=(0, 2, 5, 10, 20, 30, 40, 60), n_rep=10000,
     relabelled cohort holds in one node towards A->B and computes the null on
     those resolved trees, so its null depends on the data."""
     rng = np.random.default_rng(seed)
-    labs = ["A", "B", "C"]
-    perms = list(itertools.permutations(labs))
     rows = []
     for m in m_list:
         trees = [T_AB] * 2 + [T_BA] + [T_ABC if j % 2 == 0 else T_CAB for j in range(m)]
@@ -341,7 +350,8 @@ def resolution_null(m_list=(0, 2, 5, 10, 20, 30, 40, 60), n_rep=10000,
         tail, q_res = {}, {}
         rejected = Counter()
         for _ in range(n_rep):
-            relab = [relabel(t, dict(zip(labs, perms[rng.integers(6)]))) for t in trees]
+            relab = [relabel(t, dict(zip(labels(t), rng.permutation(labels(t)))))
+                     for t in trees]
             st = Counter(pair_state(t) for t in relab)
             key = (st["f"], st["r"], st["s"])
             for rule in ("strict", "lenient", "majority"):
