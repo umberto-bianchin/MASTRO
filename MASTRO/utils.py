@@ -95,7 +95,11 @@ def wy_threshold(minima, alpha):
     equal minima (a pattern computed exactly recurs with the same p-value
     across resamples), and rejecting at it would include the whole block,
     e.g. FWER 0.09 at alpha = 0.05 on breast sigma=2; the threshold then
-    steps below the block. -inf (reject nothing) when no minimum qualifies.
+    steps below the block. When the block holds the smallest minimum, every
+    t < s[0] qualifies (no resample would reject) and the threshold is the
+    largest float below s[0]: with every minimum at 1.0 (the family is empty
+    on every resample, e.g. theta = 1 with 10 trees per patient) any pattern
+    with p < 1 is rejected. -inf (reject nothing) only when alpha * m < 1.
     """
     s = np.sort(np.asarray(minima, dtype=float))
     k = int(np.floor(alpha * len(s)))
@@ -105,7 +109,7 @@ def wy_threshold(minima, alpha):
     if np.searchsorted(s, t, side="right") <= k:
         return float(t)
     below = np.searchsorted(s, t, side="left")   # minima strictly below t
-    return float(s[below - 1]) if below > 0 else float("-inf")
+    return float(s[below - 1]) if below > 0 else float(np.nextafter(s[0], -np.inf))
 
 
 # =====================================================================
