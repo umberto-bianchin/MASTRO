@@ -13,6 +13,9 @@ marks f = theta.
 
 Usage:
     python3 plot_power.py --power_dir results/power --out results/power/power_recall.pdf
+
+Several --power_dir values merge the (N, f) cells of runs over disjoint f grids,
+e.g. a later run of the f = theta points only.
 """
 
 import argparse
@@ -20,12 +23,17 @@ import csv
 from pathlib import Path
 
 
-def load_recall(csv_path):
-    """recall.csv -> dict[test][N] = list of (f, recall) sorted by f."""
-    by = {}
-    for r in csv.DictReader(open(csv_path)):
-        by.setdefault(r["test"], {}).setdefault(int(r["N"]), []).append(
-            (float(r["f"]), float(r["recall"])))
+def load_recall(csv_paths):
+    """recall.csv files -> dict[test][N] = list of (f, recall) sorted by f."""
+    by, seen = {}, set()
+    for csv_path in csv_paths:
+        for r in csv.DictReader(open(csv_path)):
+            key = (r["test"], int(r["N"]), float(r["f"]))
+            if key in seen:
+                raise SystemExit(f"cell {key} appears twice ({csv_path})")
+            seen.add(key)
+            by.setdefault(r["test"], {}).setdefault(int(r["N"]), []).append(
+                (float(r["f"]), float(r["recall"])))
     for test in by:
         for N in by[test]:
             by[test][N].sort()
@@ -34,17 +42,19 @@ def load_recall(csv_path):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--power_dir", default="results/power",
-                    help="Dir holding implant_theta<theta>/recall.csv")
+    ap.add_argument("--power_dir", nargs="+", default=["results/power"],
+                    help="Dir(s) holding implant_theta<theta>/recall.csv")
     ap.add_argument("--out", required=True, help="Output PDF/PNG")
     args = ap.parse_args()
 
-    pdir = Path(args.power_dir)
-    runs = sorted(pdir.glob("implant_theta*/recall.csv"),
-                  key=lambda p: float(p.parent.name.split("theta")[1]))
-    if not runs:
-        raise SystemExit(f"no implant_theta*/recall.csv under {pdir}")
-    thetas = [float(p.parent.name.split("theta")[1]) for p in runs]
+    by_theta = {}
+    for pdir in map(Path, args.power_dir):
+        for p in pdir.glob("implant_theta*/recall.csv"):
+            by_theta.setdefault(float(p.parent.name.split("theta")[1]), []).append(p)
+    if not by_theta:
+        raise SystemExit(f"no implant_theta*/recall.csv under {args.power_dir}")
+    thetas = sorted(by_theta)
+    runs = [by_theta[t] for t in thetas]
 
     import matplotlib
     matplotlib.use("Agg")
@@ -54,8 +64,8 @@ def main():
                              sharey=True, squeeze=False)
     axes = axes[0]
 
-    for ax, theta, csv_path in zip(axes, thetas, runs):
-        by = load_recall(csv_path)
+    for ax, theta, csv_paths in zip(axes, thetas, runs):
+        by = load_recall(csv_paths)
         Ns = sorted(by.get("theta", {}))
         cmap = plt.cm.viridis
         colors = {N: cmap(0.08 + 0.84 * i / max(1, len(Ns) - 1))
@@ -68,7 +78,8 @@ def main():
             ax.plot(fs, rc, marker="o", ms=4, color=colors[N], lw=1.6,
                     label=f"$s^{{(\\theta)}}$, N={N}", zorder=3)
 
-        # expected-support test: reference (identical across N here -> plot once)
+        # expected-support test: reference, plotted once for the smallest N,
+        # its lowest curve (larger N only raise it, to ~1 across the grid)
         if "exp" in by:
             N0 = sorted(by["exp"])[0]
             fs = [f for f, _ in by["exp"][N0]]
