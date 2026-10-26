@@ -24,10 +24,6 @@ The variants, as in ablation_toys.VARIANTS:
 c_i is the number of trees of patient i that match, L = 1000 the grid of the
 weighted support (--L_cap of compute_significance_ensemble.py).
 
-A fifth series, maestri_rand, breaks the ties of the MAESTRI statistic at
-random, P(S > s) + U P(S = s): exactly uniform under the null, it shows how
-far below the diagonal the discreteness alone puts the test.
-
 The y axis is linear up to 1.3 x the largest expected value (dotted line) and
 logarithmic above it.
 
@@ -198,11 +194,6 @@ def main():
         S["w"] += w[k]
         S["c"] += c[k]
     P = {v: pvalue(v, S[stat_of[v]]) for v in VARIANTS}
-    # randomized MAESTRI p-value P(S > s) + U P(S = s): exactly uniform under
-    # the null, it shows where the discrete one sits below the diagonal
-    t, s = tails["maestri"], S["w"]
-    lo = t[np.minimum(s + 1, len(t) - 1)]
-    P["maestri_rand"] = lo + rng.random(n) * (pvalue("maestri", s) - lo)
     np.savez_compressed(out / f"{tag}.npz", **P)
 
     alphas = (0.05, 0.01, 1e-3, 1e-4, 1e-5)
@@ -210,8 +201,8 @@ def main():
         wr = csv.writer(f)
         wr.writerow(["variant", "n_datasets", "p_real"] + [f"P(p<={a})" for a in alphas]
                     + ["frac_p_le_1e-300"])
-        for v in VARIANTS + ["maestri_rand"]:
-            row = [v, n, f"{pvalue(v, real[stat_of[v]]):.3e}" if v in VARIANTS else ""]
+        for v in VARIANTS:
+            row = [v, n, f"{pvalue(v, real[stat_of[v]]):.3e}"]
             row += [f"{np.mean(P[v] <= a):.4g}" for a in alphas]
             row += [f"{np.mean(P[v] <= FLOOR):.4g}"]
             wr.writerow(row)
@@ -236,12 +227,12 @@ def main():
     ax.minorticks_off()
     if ymax > lin:
         ax.axhline(lin, color="0.6", lw=0.6, ls=":")
-    for v in ["maestri_rand"] + VARIANTS:
+    for v in VARIANTS:
         obs = -np.log10(np.maximum(np.sort(P[v]), FLOOR))
         # one marker per quarter pixel: the PDF stays light, nothing visible is lost
         disp = ax.transData.transform(np.column_stack([expected, obs]))
         _, keep = np.unique(np.floor(disp * 4), axis=0, return_index=True)
-        name, col = STYLE.get(v, ("MAESTRI, ties randomized", "0.55"))
+        name, col = STYLE[v]
         ax.plot(expected[keep], obs[keep], ".", ms=2.5, color=col, label=name)
     ax.set_xlabel(r"expected $-\log_{10} p$", fontsize=8)
     ax.set_ylabel(r"observed $-\log_{10} p$", fontsize=8)
