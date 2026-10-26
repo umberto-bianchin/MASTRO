@@ -39,5 +39,5 @@ export PAR=${PAR:-$SLURM_CPUS_PER_TASK}
 export WORKDIR=${WORKDIR:-/dev/shm/$USER-$SLURM_JOB_ID}
 mkdir -p "$WORKDIR"
 trap 'rm -rf "$WORKDIR"' EXIT
-echo "node=$(hostname) cpus=$SLURM_CPUS_PER_TASK PAR=$PAR COHORT=$COHORT EXACT_WHEN_CHEAPER=${EXACT_WHEN_CHEAPER:-0} MC_SAMPLES=${MC_SAMPLES:-default} OUT_ROOT=${OUT_ROOT:-default} WORKDIR=$WORKDIR"
+echo "node=$(hostname) cpus=$SLURM_CPUS_PER_TASK PAR=$PAR COHORT=$COHORT EXACT_WHEN_CHEAPER=${EXACT_WHEN_CHEAPER:-1} MC_SAMPLES=${MC_SAMPLES:-default} OUT_ROOT=${OUT_ROOT:-default} WORKDIR=$WORKDIR"
 srun apptainer exec "$SIF" bash "scripts/run_exp_discovery_${COHORT}.sh"

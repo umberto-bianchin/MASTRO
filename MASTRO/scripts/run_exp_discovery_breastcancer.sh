@@ -25,7 +25,7 @@ THETA_LIST=${THETA_LIST:-"0.5 1.0"}
 NULL=${NULL:-perm}
 MC_SAMPLES=${MC_SAMPLES:-3000}   # per-patient MC draws; dominant cost knob
 MC_CUTOFF=${MC_CUTOFF:-8}        # M_i above which a patient uses MC
-EXACT_WHEN_CHEAPER=${EXACT_WHEN_CHEAPER:-0}  # 1: exact above the cutoff when placements <= MC_SAMPLES
+EXACT_WHEN_CHEAPER=${EXACT_WHEN_CHEAPER:-1}  # exact above the cutoff when placements <= MC_SAMPLES; 0 = always MC (pre-Oct-2026 runs)
 NPY=${NPY:-../data/breastCancer.npy}
 OUT_ROOT=${OUT_ROOT:-results/discovery}
 PLOT_ROOT=${PLOT_ROOT:-results/fdr_plots}

@@ -74,6 +74,9 @@ def main():
     ap.add_argument("--alphas", default="0.01,0.05,0.1")
     ap.add_argument("--mc_cutoff", type=int, default=8)
     ap.add_argument("--mc_samples", type=int, default=10000)
+    ap.add_argument("--exact_when_cheaper", action="store_true",
+                    help="Exact null law above --mc_cutoff when there are at "
+                         "most --mc_samples placements")
     ap.add_argument("--seed", type=int, default=12345)
     ap.add_argument("--lcmdir", default="./lcm53")
     ap.add_argument("--par", type=int, default=1)
@@ -133,6 +136,7 @@ def main():
                 args.test, args.null, args.theta,
                 args.mc_cutoff, args.mc_samples,
                 args.seed, not args.keep, args.verbose, None,
+                args.exact_when_cheaper,
             ))
 
         total = args.n_datasets

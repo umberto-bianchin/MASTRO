@@ -235,6 +235,7 @@ def calibrate_threshold(null_dir, rng, n_patients, M, bg_labels, traj, sigma, th
         r, graphs_all.resolve(), weights_uniform.resolve(), owner_txt.resolve(),
         float(sigma), lcmdir, workdir, test, null_model, theta,
         mc_cutoff, mc_samples, seed, True, verbose, None,  # theta_cand_sigma: keep legacy behaviour
+        False,  # exact_when_cheaper: every synthetic patient is below mc_cutoff
     ) for r in range(wy_M)]
 
     if par > 1:

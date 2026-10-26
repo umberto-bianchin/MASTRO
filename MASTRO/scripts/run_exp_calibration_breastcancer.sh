@@ -26,6 +26,10 @@ N_TRIALS=${N_TRIALS:-500}
 ALPHAS=${ALPHAS:-0.01,0.05,0.1}
 MC_SAMPLES=${MC_SAMPLES:-3000}   # per-patient MC draws; dominant cost knob
 MC_CUTOFF=${MC_CUTOFF:-8}        # M_i above which a patient uses MC
+OUT_ROOT=${OUT_ROOT:-results/calibration}
+EXACT_WHEN_CHEAPER=${EXACT_WHEN_CHEAPER:-1}  # exact above the cutoff when placements <= MC_SAMPLES; 0 = always MC (pre-Oct-2026 runs)
+EXACT_ARG=()
+[ "$EXACT_WHEN_CHEAPER" = 1 ] && EXACT_ARG=(--exact_when_cheaper)
 NPY=../data/breastCancer.npy
 THETA_CSV=$(echo "$THETA_LIST" | tr ' ' ',')
 
@@ -33,7 +37,7 @@ THETA_CSV=$(echo "$THETA_LIST" | tr ' ' ',')
 [ -x lcm53/lcm ] || ( echo "building LCM"; cd lcm53 && make )
 
 for SIGMA in $SIGMA_LIST; do
-  INP=results/calibration/breastCancer_inputs_sigma${SIGMA}
+  INP=$OUT_ROOT/breastCancer_inputs_sigma${SIGMA}
   echo "=== [1] build inputs: sigma=$SIGMA ==="
   python3 run_pipeline.py --npy "$NPY" --sigma "$SIGMA" --seed 0 \
     --theta_list "$THETA_CSV" --outdir "$INP"
@@ -48,7 +52,8 @@ for SIGMA in $SIGMA_LIST; do
       --n_datasets "$N_DATASETS" --m "$M_CAL" --n_trials "$N_TRIALS" \
       --alphas "$ALPHAS" \
       --mc_cutoff "$MC_CUTOFF" --mc_samples "$MC_SAMPLES" --par "$PAR" \
-      --outdir results/calibration/breastCancer_sigma${SIGMA}_theta${THETA}
+      ${EXACT_ARG[@]+"${EXACT_ARG[@]}"} \
+      --outdir $OUT_ROOT/breastCancer_sigma${SIGMA}_theta${THETA}
   done
 done
-echo "=== calibration (breastCancer) complete -> results/calibration ==="
+echo "=== calibration (breastCancer) complete -> $OUT_ROOT ==="

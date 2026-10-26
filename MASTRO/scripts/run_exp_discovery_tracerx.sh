@@ -18,7 +18,7 @@ THETA_LIST=${THETA_LIST:-"0.5 1.0"}
 NULL=${NULL:-perm}
 MC_SAMPLES=${MC_SAMPLES:-3000}   # per-patient MC draws; dominant cost knob
 MC_CUTOFF=${MC_CUTOFF:-8}        # M_i above which a patient uses MC
-EXACT_WHEN_CHEAPER=${EXACT_WHEN_CHEAPER:-0}  # 1: exact above the cutoff when placements <= MC_SAMPLES
+EXACT_WHEN_CHEAPER=${EXACT_WHEN_CHEAPER:-1}  # exact above the cutoff when placements <= MC_SAMPLES; 0 = always MC (pre-Oct-2026 runs)
 # Floor on the mining threshold of the theta-consensus family. The correct
 # threshold is floor(theta*sigma); when that drops below this value the family
 # is mined at sigma instead and run_pipeline.py warns it may be incomplete.
