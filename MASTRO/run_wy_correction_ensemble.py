@@ -315,7 +315,8 @@ def _run_resample(args):
     """Worker: null sample -> mine -> significance -> extract p-values"""
     (r, graphs_path, weights_path, owner_path,
      sigma, lcmdir, workdir, test, null_model, theta,
-     mc_cutoff, mc_samples, seed, cleanup, verbose, theta_cand_sigma) = args
+     mc_cutoff, mc_samples, seed, cleanup, verbose, theta_cand_sigma,
+     exact_when_cheaper) = args
 
     # Explicitly set verbosity in the worker: multiprocessing may use 'spawn'
     # (fresh import, VERBOSE resets to the default) rather than 'fork', so we
@@ -387,6 +388,8 @@ def _run_resample(args):
             "--mc_cutoff", str(mc_cutoff), "--mc_samples", str(mc_samples),
             "--seed", str(sig_seed),
         ]
+        if exact_when_cheaper:
+            sig_cmd.append("--exact_when_cheaper")
         if want_theta:
             sig_cmd += ["--theta", str(theta)]
         run_cmd(sig_cmd)
@@ -482,12 +485,19 @@ def main():
                     help="M_i above which to use MC sampling (default: 8)")
     ap.add_argument("--mc_samples", type=int, default=10000,
                     help="MC samples per patient (default: 10000)")
+    ap.add_argument("--exact_when_cheaper", action="store_true",
+                    help="Passed to compute_significance_ensemble.py: exact "
+                         "enumeration above --mc_cutoff when there are at most "
+                         "--mc_samples placements")
     ap.add_argument("--seed", type=int, default=42,
                     help="Random seed")
     ap.add_argument("--lcmdir", default="./lcm53",
                     help="Path to lcm53 directory")
     ap.add_argument("--outdir", required=True,
                     help="Output directory for WY results")
+    ap.add_argument("--workdir", default=None,
+                    help="Scratch directory for the per-resample mining "
+                         "(default: <outdir>/resamples)")
     ap.add_argument("--par", type=int, default=1,
                     help="Number of parallel workers (default: 1)")
     ap.add_argument("--keep", action="store_true",
@@ -521,7 +531,7 @@ def main():
     lcmdir = Path(args.lcmdir).resolve()
     outdir = Path(args.outdir).resolve()
     ensure_dir(outdir)
-    workdir = outdir / "resamples"
+    workdir = Path(args.workdir).resolve() if args.workdir else outdir / "resamples"
     ensure_dir(workdir)
 
     graphs_path = Path(args.graphs_all).resolve()
@@ -570,6 +580,7 @@ def main():
             args.test, args.null, args.theta,
             args.mc_cutoff, args.mc_samples,
             args.seed, not args.keep, args.verbose, theta_cand,
+            args.exact_when_cheaper,
         ))
 
     total = args.n_resamples

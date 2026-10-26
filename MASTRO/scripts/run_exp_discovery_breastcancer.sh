@@ -25,10 +25,18 @@ THETA_LIST=${THETA_LIST:-"0.5 1.0"}
 NULL=${NULL:-perm}
 MC_SAMPLES=${MC_SAMPLES:-3000}   # per-patient MC draws; dominant cost knob
 MC_CUTOFF=${MC_CUTOFF:-8}        # M_i above which a patient uses MC
+EXACT_WHEN_CHEAPER=${EXACT_WHEN_CHEAPER:-0}  # 1: exact above the cutoff when placements <= MC_SAMPLES
 NPY=${NPY:-../data/breastCancer.npy}
 OUT_ROOT=${OUT_ROOT:-results/discovery}
 PLOT_ROOT=${PLOT_ROOT:-results/fdr_plots}
 THETA_CSV=$(echo "$THETA_LIST" | tr ' ' ',')
+WORKDIR=${WORKDIR:-}             # scratch for WY mining; empty = <wy outdir>/resamples
+WORKDIR_ARG=()
+[ -n "$WORKDIR" ] && WORKDIR_ARG=(--workdir "$WORKDIR")
+EXACT_SIG=(); EXACT_WY=()
+if [ "$EXACT_WHEN_CHEAPER" = 1 ]; then
+  EXACT_SIG=(--sig_exact_when_cheaper); EXACT_WY=(--exact_when_cheaper)
+fi
 
 [ -f "$NPY" ] || { echo "ERROR: $NPY not found" >&2; exit 1; }
 [ -x lcm53/lcm ] || ( echo "building LCM"; cd lcm53 && make )
@@ -44,6 +52,7 @@ for SIGMA in $SIGMA_LIST; do
     --min_mine_sigma 2 \
     --significance --sig_null "$NULL" \
     --sig_mc_cutoff "$MC_CUTOFF" --sig_mc_samples "$MC_SAMPLES" --sig_n_jobs "$PAR" \
+    ${EXACT_SIG[@]+"${EXACT_SIG[@]}"} \
     --outdir "$OUT"
 
   SIGDIR="$OUT/significance"
@@ -62,6 +71,8 @@ for SIGMA in $SIGMA_LIST; do
       --test both --null "$NULL" --theta "$THETA" --par "$PAR" \
       --min_mine_sigma 2 \
       --mc_cutoff "$MC_CUTOFF" --mc_samples "$MC_SAMPLES" \
+      ${EXACT_WY[@]+"${EXACT_WY[@]}"} \
+      ${WORKDIR_ARG[@]+"${WORKDIR_ARG[@]}"} \
       --outdir "$WYOUT" \
       --pvalues_exp   "$PVAL_EXP" \
       --pvalues_theta "$PVAL_THETA" \

@@ -132,7 +132,8 @@ def run_postfilters(expected_filtered: Path, weights_txt: Path, owner_txt: Path,
 # -------------------------
 def _run_sig(input_path, output_path, npy_path, graphs_all_path,
              weights_txt, owner_txt,
-             test, null_model, mc_cutoff, mc_samples, seed, theta=None, n_jobs=1):
+             test, null_model, mc_cutoff, mc_samples, seed, theta=None, n_jobs=1,
+             exact_when_cheaper=False):
     """Invoke compute_significance_ensemble.py for one (filtered file, test) pair"""
     cmd = [
         PYTHON, str(SCRIPT_DIR / "compute_significance_ensemble.py"),
@@ -153,6 +154,8 @@ def _run_sig(input_path, output_path, npy_path, graphs_all_path,
         cmd += ["--graphs_all", str(graphs_all_path)]
     if theta is not None:
         cmd += ["--theta", str(theta)]
+    if exact_when_cheaper:
+        cmd.append("--exact_when_cheaper")
     run_cmd(cmd)
 
 
@@ -162,7 +165,7 @@ def run_significance_tests(sig_dir, npy_path, npy_sampled_path,
                            weights_sampled_txt, owner_sampled_txt,
                            alg0_filtered, alg1_filtered, alg2_paths, alg3_paths,
                            thetas, null_model, mc_cutoff, mc_samples, seed, n_jobs=1,
-                           single_tree_only=False):
+                           single_tree_only=False, exact_when_cheaper=False):
     """Run significance tests on every pipeline output
 
     The baseline uses the sampled weights/owner (1.0 per patient, one transaction
@@ -189,7 +192,7 @@ def run_significance_tests(sig_dir, npy_path, npy_sampled_path,
         print(f"[INFO] Running {len(jobs)} significance test (single-tree only), "
               f"{n_jobs} workers")
         for j in jobs:
-            _run_sig(n_jobs=n_jobs, **j)
+            _run_sig(n_jobs=n_jobs, exact_when_cheaper=exact_when_cheaper, **j)
         return
 
     # expected-support family -> expected-support test, with uniform weights/owner
@@ -225,7 +228,7 @@ def run_significance_tests(sig_dir, npy_path, npy_sampled_path,
     # budget rather than fanning out the handful of CSVs across a shallow pool.
     print(f"[INFO] Running {len(jobs)} significance tests, {n_jobs} workers each")
     for j in jobs:
-        _run_sig(n_jobs=n_jobs, **j)
+        _run_sig(n_jobs=n_jobs, exact_when_cheaper=exact_when_cheaper, **j)
 
 # -------------------------
 # Result comparison
@@ -315,6 +318,9 @@ def main():
                     help="M_i above which to use MC in significance testing")
     ap.add_argument("--sig_mc_samples", type=int, default=10000,
                     help="Monte-Carlo samples per patient in significance testing")
+    ap.add_argument("--sig_exact_when_cheaper", action="store_true",
+                    help="Exact enumeration above --sig_mc_cutoff when there "
+                         "are at most --sig_mc_samples placements")
     ap.add_argument("--sig_n_jobs", type=int, default=1,
                     help="Parallel workers for per-patient phi_i computation "
                          "in significance testing (default 1 = sequential)")
@@ -574,6 +580,7 @@ def main():
             seed=args.seed,
             n_jobs=args.sig_n_jobs,
             single_tree_only=args.single_tree_only,
+            exact_when_cheaper=args.sig_exact_when_cheaper,
         )
 
     print("\n[DONE] Outputs are under:", outdir)

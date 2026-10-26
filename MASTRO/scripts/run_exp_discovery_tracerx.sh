@@ -18,6 +18,7 @@ THETA_LIST=${THETA_LIST:-"0.5 1.0"}
 NULL=${NULL:-perm}
 MC_SAMPLES=${MC_SAMPLES:-3000}   # per-patient MC draws; dominant cost knob
 MC_CUTOFF=${MC_CUTOFF:-8}        # M_i above which a patient uses MC
+EXACT_WHEN_CHEAPER=${EXACT_WHEN_CHEAPER:-0}  # 1: exact above the cutoff when placements <= MC_SAMPLES
 # Floor on the mining threshold of the theta-consensus family. The correct
 # threshold is floor(theta*sigma); when that drops below this value the family
 # is mined at sigma instead and run_pipeline.py warns it may be incomplete.
@@ -30,6 +31,13 @@ PLOT_ROOT=${PLOT_ROOT:-results/fdr_plots}
 GRAPHS=../data/TRACERx/graphs_tracerx.txt
 OWNER=../data/TRACERx/owner_tracerx.txt
 THETA_CSV=$(echo "$THETA_LIST" | tr ' ' ',')
+WORKDIR=${WORKDIR:-}             # scratch for WY mining; empty = <wy outdir>/resamples
+WORKDIR_ARG=()
+[ -n "$WORKDIR" ] && WORKDIR_ARG=(--workdir "$WORKDIR")
+EXACT_SIG=(); EXACT_WY=()
+if [ "$EXACT_WHEN_CHEAPER" = 1 ]; then
+  EXACT_SIG=(--sig_exact_when_cheaper); EXACT_WY=(--exact_when_cheaper)
+fi
 MIN_MINE_ARG=()
 [ -n "$MIN_MINE_SIGMA" ] && MIN_MINE_ARG=(--min_mine_sigma "$MIN_MINE_SIGMA")
 
@@ -47,6 +55,7 @@ for SIGMA in $SIGMA_LIST; do
     ${MIN_MINE_ARG[@]+"${MIN_MINE_ARG[@]}"} \
     --significance --sig_null "$NULL" \
     --sig_mc_cutoff "$MC_CUTOFF" --sig_mc_samples "$MC_SAMPLES" --sig_n_jobs "$PAR" \
+    ${EXACT_SIG[@]+"${EXACT_SIG[@]}"} \
     --outdir "$OUT"
 
   SIGDIR="$OUT/significance"
@@ -65,6 +74,8 @@ for SIGMA in $SIGMA_LIST; do
       --test both --null "$NULL" --theta "$THETA" --par "$PAR" \
       ${MIN_MINE_ARG[@]+"${MIN_MINE_ARG[@]}"} \
       --mc_cutoff "$MC_CUTOFF" --mc_samples "$MC_SAMPLES" \
+      ${EXACT_WY[@]+"${EXACT_WY[@]}"} \
+      ${WORKDIR_ARG[@]+"${WORKDIR_ARG[@]}"} \
       --outdir "$WYOUT" \
       --pvalues_exp   "$PVAL_EXP" \
       --pvalues_theta "$PVAL_THETA" \

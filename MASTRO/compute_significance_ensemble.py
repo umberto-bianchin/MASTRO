@@ -265,7 +265,7 @@ def compute_match_sets(placements, rel_tensor, expected):
 # =====================================================================
 def compute_phi_i(rel_tensor, weights_i, pattern_items, alterations,
                   null_model, mc_cutoff, mc_samples, max_exact_placements,
-                  L, rng):
+                  L, rng, exact_when_cheaper=False):
     """Compute patient-level phi_i by histogramming null placement match sets
 
     Returns (phi, used_mc) where *used_mc* is True when the patient-level
@@ -304,6 +304,10 @@ def compute_phi_i(rel_tensor, weights_i, pattern_items, alterations,
     # does not grow with M and the M_i cutoff does not apply
     if M <= mc_cutoff or null_model == "perm_tree":
         placements = build_placements_exact(n_alt, k, null_model, max_exact_placements)
+    elif exact_when_cheaper:
+        # Enumeration costs one row per placement, sampling one row per draw:
+        # with at most mc_samples placements the exact law is also the cheaper
+        placements = build_placements_exact(n_alt, k, null_model, mc_samples)
     if placements is None:
         placements = build_placements_mc(n_alt, k, mc_samples, null_model, rng)
         used_mc = True
@@ -533,6 +537,7 @@ def _process_trajectory(task):
             mc_samples=G["mc_samples"],
             max_exact_placements=G["max_exact_placements"],
             L=G["L"],
+            exact_when_cheaper=G["exact_when_cheaper"],
             rng=rng,
         )
         phis.append(phi_i)
@@ -613,6 +618,10 @@ def main():
                          "(default: 10000)")
     ap.add_argument("--max_exact_placements", type=int, default=2_000_000,
                     help="Fall back to MC if exact enumeration exceeds this")
+    ap.add_argument("--exact_when_cheaper", action="store_true",
+                    help="For M_i > --mc_cutoff, enumerate the placements "
+                         "exactly when there are at most --mc_samples of them "
+                         "(default: off, always Monte-Carlo above the cutoff)")
     ap.add_argument("--seed", type=int, default=0,
                     help="Seed for the Monte-Carlo RNG")
     ap.add_argument("--L_cap", type=int, default=1000,
@@ -734,6 +743,7 @@ def main():
         patient_info=patient_info, patient_weights=patient_weights,
         null=args.null, mc_cutoff=args.mc_cutoff, mc_samples=args.mc_samples,
         max_exact_placements=args.max_exact_placements, seed=args.seed,
+        exact_when_cheaper=args.exact_when_cheaper,
         theta=args.theta, theta_threshold=theta_threshold,
         want_exp=want_exp, want_theta=want_theta,
         allow_incomplete=args.allow_incomplete,
