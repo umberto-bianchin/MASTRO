@@ -30,6 +30,7 @@ MC_CUTOFF=${MC_CUTOFF:-8}
 ALPHAS=${ALPHAS:-0.01,0.05,0.1}
 OUT_BASE=${OUT_BASE:-results/ablation}
 WORKDIR=${WORKDIR:-}             # mining scratch; empty = <outdir>/work
+SHARD=${SHARD:-}                 # I/N: this job's share of the null datasets (no analysis)
 
 # The tracked lcm53/lcm is a macOS binary: rebuild when it cannot run here
 # (exit 126/127 = not executable / wrong architecture)
@@ -66,8 +67,10 @@ for DS in $DATASETS; do
       --owner      "$INP/inputs/owner.txt" \
       --sigma "$SIGMA" --n_cal "$N_CAL" --n_val "$N_VAL" --alphas "$ALPHAS" \
       --mc_cutoff "$MC_CUTOFF" --mc_samples "$MC_SAMPLES" --par "$PAR" \
-      --outdir "$OUT" ${WORKDIR:+--workdir "$WORKDIR/${DS}_sigma${SIGMA}"}
+      --outdir "$OUT" ${WORKDIR:+--workdir "$WORKDIR/${DS}_sigma${SIGMA}"} \
+      ${SHARD:+--shard "$SHARD"}
 
+    [ -n "$SHARD" ] && continue
     python3 plot_ablation_qq.py --dir "$OUT"
     python3 plot_ablation_qq.py --dir "$OUT" --family mined
   done

@@ -288,6 +288,11 @@ def main():
     ap.add_argument("--keep", action="store_true")
     ap.add_argument("--verbose", action="store_true")
     ap.add_argument("--analyze_only", action="store_true")
+    ap.add_argument("--shard", default=None,
+                    help="I/N: run only the null datasets whose task index is I "
+                         "mod N, so N jobs on N nodes split one run; shards skip "
+                         "minima.csv and the analysis, which a final run without "
+                         "--shard redoes from the datasets on disk")
     ap.add_argument("--n_trials", type=int, default=1000,
                     help="Bootstrap calibration/validation splits for the FWER")
     ap.add_argument("--m_cal", type=int, default=None,
@@ -328,6 +333,9 @@ def main():
             pools.append(("tree_cal", args.n_cal))
         tasks = [task(pool, r, fixed if pool == "perm_val" else None)
                  for pool, n in pools for r in range(n)]
+        if args.shard:
+            i, n = (int(x) for x in args.shard.split("/"))
+            tasks = tasks[i::n]
         print(f"[ABL] n_patients={n_patients} trees={K} sigma={args.sigma} "
               f"variants={variants} real family={len(fixed)} "
               f"null datasets={len(tasks)} par={args.par}", flush=True)
@@ -338,6 +346,11 @@ def main():
                 results.append(res)
                 if done % step == 0 or done == len(tasks):
                     print(f"[ABL] dataset {done}/{len(tasks)} done", flush=True)
+
+        if args.shard:
+            print(f"[ABL] shard {args.shard} done; run again without --shard "
+                  f"for minima.csv and the analysis", flush=True)
+            return
 
         with (outdir / "minima.csv").open("w", newline="") as f:
             wr = csv.writer(f)
