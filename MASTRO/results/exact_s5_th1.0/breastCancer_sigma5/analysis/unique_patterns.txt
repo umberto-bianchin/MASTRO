@@ -1,0 +1,31 @@
+## Only in alg0_mastro_random: 22 patterns
+  - CDH1->-AR
+  - CDH1->-POLE
+  - CREBBP->-PIK3CA
+  - ERBB3->-PIK3CA
+  - ESR1->-FAT1
+  - KDM5C->-PIK3CA
+  - MAP3K1->-ESR1
+  - NF1->-CDH1
+  - PIK3CA->-EZH2
+  - PIK3CA->-IKZF1
+  - PIK3CA->-PAK7
+  - PIK3CA->-PIK3CG
+  - TET1->-ARID1A
+  - TP53->-AR
+  - TP53->-BRIP1
+  - TP53->-HIST1H3B
+  - TP53->-IKZF1
+  - TP53->-INPP4B
+  - TP53->-PLK2
+  - ZFHX3->-CDH1
+  - CDH1->-ARID1A CDH1->-PIK3CA PIK3CA->-ARID1A
+  - CDH1->-ERBB2 CDH1->-PIK3CA ERBB2->-PIK3CA
+
+## Only in alg1_expected_uniform: 1 patterns
+  - PIK3CA->-EGFR
+
+## Only in alg2_theta1.0: 0 patterns
+
+## Only in alg3_theta1.0: 0 patterns
+
