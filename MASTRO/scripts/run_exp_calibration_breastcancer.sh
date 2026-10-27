@@ -30,6 +30,9 @@ OUT_ROOT=${OUT_ROOT:-results/calibration}
 EXACT_WHEN_CHEAPER=${EXACT_WHEN_CHEAPER:-1}  # exact above the cutoff when placements <= MC_SAMPLES; 0 = always MC (pre-Oct-2026 runs)
 EXACT_ARG=()
 [ "$EXACT_WHEN_CHEAPER" = 1 ] && EXACT_ARG=(--exact_when_cheaper)
+WORKDIR=${WORKDIR:-}             # scratch for null-dataset mining; empty = <outdir>/resamples
+WORKDIR_ARG=()
+[ -n "$WORKDIR" ] && WORKDIR_ARG=(--workdir "$WORKDIR")
 NPY=../data/breastCancer.npy
 THETA_CSV=$(echo "$THETA_LIST" | tr ' ' ',')
 
@@ -53,6 +56,7 @@ for SIGMA in $SIGMA_LIST; do
       --alphas "$ALPHAS" \
       --mc_cutoff "$MC_CUTOFF" --mc_samples "$MC_SAMPLES" --par "$PAR" \
       ${EXACT_ARG[@]+"${EXACT_ARG[@]}"} \
+      ${WORKDIR_ARG[@]+"${WORKDIR_ARG[@]}"} \
       --outdir $OUT_ROOT/breastCancer_sigma${SIGMA}_theta${THETA}
   done
 done

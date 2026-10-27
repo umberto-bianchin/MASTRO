@@ -305,7 +305,7 @@ def figure(entries, n_seeds):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--discovery", default="results/b20000")
+    ap.add_argument("--discovery", default="results/exact")
     ap.add_argument("--seeds", default="results/singletree_seeds")
     ap.add_argument("--sigmas", default="2,5")
     ap.add_argument("--alpha", type=float, default=0.05)

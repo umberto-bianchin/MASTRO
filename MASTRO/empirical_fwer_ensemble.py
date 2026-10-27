@@ -85,6 +85,9 @@ def main():
     ap.add_argument("--verbose", action="store_true",
                     help="Echo every per-dataset subcommand (default: quiet)")
     ap.add_argument("--outdir", required=True)
+    ap.add_argument("--workdir", default=None,
+                    help="Scratch directory for the per-dataset mining "
+                         "(default: <outdir>/resamples)")
     ap.add_argument("--from_pool", action="store_true",
                     help="Skip the null-dataset pool and rerun only the "
                          "bootstrap on OUTDIR/pool_min_pvalues.csv")
@@ -107,7 +110,7 @@ def main():
         if len(min_exp) != args.n_datasets:
             ap.error(f"{pool_csv} has {len(min_exp)} datasets, not --n_datasets")
     else:
-        workdir = outdir / "resamples"
+        workdir = Path(args.workdir).resolve() if args.workdir else outdir / "resamples"
         ensure_dir(workdir)
 
         graphs_path = Path(args.graphs_all).resolve()
