@@ -38,8 +38,10 @@ THETA_CSV=$(echo "$THETA_LIST" | tr ' ' ',')
 for SIGMA in $SIGMA_LIST; do
   INP=$OUT_ROOT/tracerx_inputs_sigma${SIGMA}
   echo "=== [1] build inputs: sigma=$SIGMA ==="
+  # Only the input files are used below: --min_mine_sigma skips the theta
+  # candidate mining at floor(theta*sigma) (sigma=1 for theta=0.5), which blows up
   python3 run_pipeline.py --graphs "$GRAPHS" --owner "$OWNER" --sigma "$SIGMA" \
-    --seed 0 --theta_list "$THETA_CSV" --outdir "$INP"
+    --seed 0 --theta_list "$THETA_CSV" --min_mine_sigma "$SIGMA" --outdir "$INP"
 
   for THETA in $THETA_LIST; do
     echo "=== [2] empirical FWER: sigma=$SIGMA theta=$THETA null=$NULL ==="
