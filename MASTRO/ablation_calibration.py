@@ -101,7 +101,7 @@ def read_pvals(path):
 def _run_dataset(args):
     (pool, r, graphs_path, weights_path, owner_path, owner0, n_patients,
      files, variants, sigma, lcmdir, workdir, outdir, mc_cutoff, mc_samples,
-     seed, keep, verbose, fixed, n_jobs) = args
+     exact_when_cheaper, seed, keep, verbose, fixed, n_jobs) = args
     set_verbose(verbose)
     out_csv = outdir / "pvals" / pool / f"{r}.csv.gz"
     fixed_csv = outdir / "pvals_fixed" / pool / f"{r}.csv.gz"
@@ -132,7 +132,8 @@ def _run_dataset(args):
                          "-w", str(w), "--owner", str(o), "--graphs_all", str(data),
                          "--test", "exp", "--null", null,
                          "--mc_cutoff", str(mc_cutoff), "--mc_samples", str(mc_samples),
-                         "--seed", str(seed + r), "--n_jobs", str(n_jobs)])
+                         "--seed", str(seed + r), "--n_jobs", str(n_jobs)]
+                        + (["--exact_when_cheaper"] if exact_when_cheaper else []))
                 for pat, p in read_pvals(sig).items():
                     table.setdefault(pat, {})[v] = p
             return table
@@ -277,6 +278,9 @@ def main():
     ap.add_argument("--alphas", default="0.01,0.05,0.1")
     ap.add_argument("--mc_cutoff", type=int, default=8)
     ap.add_argument("--mc_samples", type=int, default=3000)
+    ap.add_argument("--exact_when_cheaper", action="store_true",
+                    help="Exact law above --mc_cutoff when a patient has at "
+                         "most --mc_samples placements (as in the discovery runs)")
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--lcmdir", default="./lcm53")
     ap.add_argument("--par", type=int, default=1)
@@ -319,7 +323,8 @@ def main():
         def task(pool, r, fixed=None, n_jobs=1):
             return (pool, r, graphs_path, weights_path, owner_path, owner0, n_patients,
                     files, variants, args.sigma, Path(args.lcmdir).resolve(), workdir,
-                    outdir, args.mc_cutoff, args.mc_samples, args.seed, args.keep,
+                    outdir, args.mc_cutoff, args.mc_samples,
+                    args.exact_when_cheaper, args.seed, args.keep,
                     args.verbose, fixed, n_jobs)
 
         # The real cohort first: its family is the fixed family of the Q-Q plot.

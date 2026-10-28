@@ -25,8 +25,10 @@ SIGMA_LIST=${SIGMA_LIST:-"5"}
 N_CAL=${N_CAL:-500}
 N_VAL=${N_VAL:-500}
 PAR=${PAR:-50}
-MC_SAMPLES=${MC_SAMPLES:-3000}   # per-patient MC draws, 'perm' variants only
+MC_SAMPLES=${MC_SAMPLES:-20000}  # per-patient MC draws, 'perm' variants only
 MC_CUTOFF=${MC_CUTOFF:-8}
+EXACT_WHEN_CHEAPER=${EXACT_WHEN_CHEAPER:-1}  # exact above the cutoff when placements <= MC_SAMPLES
+# MC_SAMPLES=3000 EXACT_WHEN_CHEAPER=0 reproduce results/ablation and results/ablation_v2
 ALPHAS=${ALPHAS:-0.01,0.05,0.1}
 OUT_BASE=${OUT_BASE:-results/ablation}
 WORKDIR=${WORKDIR:-}             # mining scratch; empty = <outdir>/work
@@ -68,7 +70,8 @@ for DS in $DATASETS; do
       --sigma "$SIGMA" --n_cal "$N_CAL" --n_val "$N_VAL" --alphas "$ALPHAS" \
       --mc_cutoff "$MC_CUTOFF" --mc_samples "$MC_SAMPLES" --par "$PAR" \
       --outdir "$OUT" ${WORKDIR:+--workdir "$WORKDIR/${DS}_sigma${SIGMA}"} \
-      ${SHARD:+--shard "$SHARD"}
+      ${SHARD:+--shard "$SHARD"} \
+      $( [ "$EXACT_WHEN_CHEAPER" = 1 ] && echo --exact_when_cheaper )
 
     [ -n "$SHARD" ] && continue
     python3 plot_ablation_qq.py --dir "$OUT"
