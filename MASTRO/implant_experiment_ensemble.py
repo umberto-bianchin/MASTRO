@@ -2,13 +2,17 @@
 
 A ground-truth experiment designed to expose the difference between the two
 tests. A known linear trajectory P = X1 -> X2 -> ... -> Xk over fresh
-alterations is implanted into N randomly chosen "carrier" patients. In each
-carrier we implant P perfectly in a fraction f of that patient's M trees (as a
-real ancestor chain) and randomly in the remaining (1 - f) trees (the same
-alterations placed so that P is not observed). Non-carrier patients also carry
-the X alterations in every tree, but always in a scrambled order, so that
-presence and co-occurrence of the X alterations are identical across the whole
-cohort and only the *conserved order* of P separates carriers from non-carriers.
+alterations is implanted into N randomly chosen "carrier" patients. Every
+patient holds one alteration set, the X alterations plus 1-2 background ones
+drawn once per patient, and every tree is a chain over that whole set. In each
+carrier we implant P perfectly in a fraction f of that patient's M trees (X in
+the implanted order, background at random positions) and scramble the
+remaining (1 - f) trees (a uniformly random order of the whole set).
+Non-carriers hold only scrambled trees, so presence and co-occurrence of the X
+alterations are identical across the whole cohort and only the *conserved
+order* of P separates carriers from non-carriers. A scrambled tree is a uniform
+relabeling of any other tree of its patient, so a cohort without carriers
+follows the per-patient permutation null exactly.
 
 With uniform weights w = 1/M this gives, by construction:
     * expected support    s^exp(P)   is about N * f
@@ -66,33 +70,30 @@ def _background_tree(rng, bg_labels, min_n=2, max_n=4):
     return np.array(_chain_edges("GL", chosen), dtype=object)
 
 
-def _perfect_tree(rng, traj, bg_labels):
-    """Carrier tree containing P as a real ancestor chain, plus background."""
+def _perfect_tree(rng, traj, bg):
+    """Carrier tree containing P as a real ancestor chain, with the patient's
+    background alterations inserted at random positions."""
     seq = list(traj)
-    n_bg = int(rng.integers(0, 3))
-    if n_bg:
-        seq = seq + list(rng.choice(bg_labels, size=min(n_bg, len(bg_labels)),
-                                    replace=False))
+    for b in bg:
+        seq.insert(int(rng.integers(0, len(seq) + 1)), b)
     return np.array(_chain_edges("GL", seq), dtype=object)
 
 
-def _noisy_tree(rng, traj, bg_labels):
-    """Carrier tree in which P's alterations are present but placed in a random
-    order (a random-insertion null for the trajectory).
+def _noisy_tree(rng, traj, bg):
+    """Tree in which the patient's alterations, P's and the background, are
+    laid out as a chain in a uniformly random order.
 
-    The k trajectory alterations are laid out as a random chain. P (which needs
-    all C(k,2) forward pairs) is realised only when that random order happens to
-    be the conserved one, an event of probability 1/k!. This is deliberate: the
+    P (which needs all C(k,2) forward pairs) is realised only when the relative
+    order of its k alterations happens to be the conserved one, an event of
+    probability 1/k!. This is deliberate: the
     resulting mild, controlled contamination makes the per-patient presence a
     random variable slightly above f, which turns the recovery curves into
     smooth gradients (and keeps the null non-degenerate) rather than sharp steps.
     A moderate k (we use k = 4, so the accidental rate is 1/24) keeps this noise
     small enough not to saturate the low-theta regime."""
-    perm = list(traj)
-    rng.shuffle(perm)  # equals the conserved order (and thus realises P) w.p. 1/k!
-    n_bg = int(rng.integers(1, 3))
-    bg = list(rng.choice(bg_labels, size=min(n_bg, len(bg_labels)), replace=False))
-    return np.array(_chain_edges("GL", perm + bg), dtype=object)
+    seq = list(traj) + list(bg)
+    rng.shuffle(seq)  # realises P w.p. 1/k!, as the null does
+    return np.array(_chain_edges("GL", seq), dtype=object)
 
 
 def build_cohort(rng, n_patients, M, traj, bg_labels, carriers, f):
@@ -101,13 +102,18 @@ def build_cohort(rng, n_patients, M, traj, bg_labels, carriers, f):
     data = np.empty(n_patients, dtype=object)
     for i in range(n_patients):
         trees = []
+        # One background set per patient: all trees of a patient carry the
+        # same alterations, as the per-patient permutation null assumes
+        n_bg = int(rng.integers(1, 3))
+        bg = list(rng.choice(bg_labels, size=min(n_bg, len(bg_labels)),
+                             replace=False))
         if i in carriers:
             n_perfect = int(round(f * M))
             for j in range(M):
                 if j < n_perfect:
-                    trees.append(_perfect_tree(rng, traj, bg_labels))
+                    trees.append(_perfect_tree(rng, traj, bg))
                 else:
-                    trees.append(_noisy_tree(rng, traj, bg_labels))
+                    trees.append(_noisy_tree(rng, traj, bg))
         else:
             # Non-carriers now also carry the trajectory alterations, but always
             # scrambled: presence and co-occurrence match the carriers, so only
@@ -117,7 +123,7 @@ def build_cohort(rng, n_patients, M, traj, bg_labels, carriers, f):
             # pure background tree.
             for _ in range(M):
                 if len(traj):
-                    trees.append(_noisy_tree(rng, traj, bg_labels))
+                    trees.append(_noisy_tree(rng, traj, bg))
                 else:
                     trees.append(_background_tree(rng, bg_labels))
         data[i] = trees
