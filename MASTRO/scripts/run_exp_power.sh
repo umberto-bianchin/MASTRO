@@ -27,6 +27,7 @@ SIGMA=${SIGMA:-2.0}
 ALPHA=${ALPHA:-0.05}
 N_TRIALS=${N_TRIALS:-200}
 WY_M=${WY_M:-500}
+CALIBRATION=${CALIBRATION:-global}  # global: one carrier-free cohort; cell: one implanted cohort per (N, f)
 # Output base: point to a disk with space (e.g. OUT_BASE=/mnt/ssd1/power_out)
 # when /home is full. recall.csv + WY cache + trial scratch all go here.
 OUT_BASE=${OUT_BASE:-results/power}
@@ -34,13 +35,13 @@ OUT_BASE=${OUT_BASE:-results/power}
 [ -x lcm53/lcm ] || ( echo "building LCM"; cd lcm53 && make )
 
 for THETA in $THETA_LIST; do
-  echo "=== power sweep: theta=$THETA null=$NULL ==="
+  echo "=== power sweep: theta=$THETA null=$NULL calibration=$CALIBRATION wy_M=$WY_M ==="
   python3 implant_experiment_ensemble.py \
     --n_patients "$N_PATIENTS" --M "$MTREES" --k "$K" \
     --N_list "$N_LIST" --f_list "$F_LIST" \
     --theta "$THETA" --sigma "$SIGMA" --alpha "$ALPHA" \
     --null "$NULL" --test both \
-    --n_trials "$N_TRIALS" --wy_M "$WY_M" \
+    --n_trials "$N_TRIALS" --wy_M "$WY_M" --calibration "$CALIBRATION" \
     --mc_cutoff 10 --mc_samples 2000 --par "$PAR" \
     --outdir "${OUT_BASE}/implant_theta${THETA}"
 done

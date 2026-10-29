@@ -23,11 +23,18 @@ f reaches theta. This directly illustrates the incomparability of the two
 support notions.
 
 For each (N, f) we measure the recall, the fraction of trials in which P is
-reported significant at a WY-corrected FWER threshold delta_hat(alpha). The
-threshold is calibrated once, on a background-only null cohort of the same
-shape, and reused across trials (it depends on the null, not the implant).
+reported significant at a WY-corrected FWER threshold delta_hat(alpha). With
+--calibration global the threshold is calibrated once, on a carrier-free cohort
+of the same shape, and reused in every cell; with --calibration cell it is
+calibrated once per (N, f), on an implanted cohort of that cell whose resamples
+relabel every patient, carriers included. The per-patient null is conditional
+on the trees of each patient, so the agreeing trees of the carriers change the
+resamples, and only the per-cell threshold sees that.
 
-Output: recall.csv with (N, f, test, recall).
+Output: recall.csv with (N, f, test, recall); trials.csv with the smallest
+p-value of a tested trajectory containing P, per trial and test, from which the
+recall is recomputed for any threshold without rerunning the trials; and the
+thresholds with their WY minima in _null/ (global) or _cal_m<wy_M>/ (cell).
 """
 
 import argparse
@@ -142,25 +149,27 @@ def traj_items(traj):
 # =====================================================================
 # Mining + significance for one implanted dataset
 # =====================================================================
-def _recovered(sig_csv, p_items, col, delta):
-    """True if some tested trajectory contains P and has p-value <= delta."""
+def _min_p_containing(sig_csv, p_items, col):
+    """Smallest p-value among the tested trajectories that contain P, or inf
+    when none is tested. P is recovered at threshold delta iff this is <= delta,
+    so the value alone lets the recall be recomputed for any threshold."""
+    best = float("inf")
     if not sig_csv.exists():
-        return False
+        return best
     with sig_csv.open() as f:
         for row in csv.DictReader(f):
             v = row.get(col, "")
             if not v:
                 continue
-            items = set(row["pattern"].split())
-            if p_items.issubset(items) and float(v) <= delta:
-                return True
-    return False
+            if p_items.issubset(set(row["pattern"].split())):
+                best = min(best, float(v))
+    return best
 
 
 def run_trial(trial_dir, data, traj, sigma, theta, lcmdir,
-              delta_exp, delta_theta, null_model, mc_cutoff, mc_samples,
-              seed, want_exp, want_theta):
-    """Build inputs, mine, score, and report recovery flags for one dataset."""
+              null_model, mc_cutoff, mc_samples, seed, want_exp, want_theta):
+    """Build inputs, mine, score, and return, per test, the smallest p-value of
+    a tested trajectory containing P (inf if none)."""
     ensure_dir(trial_dir)
     inputs_dir = trial_dir / "inputs"
     ensure_dir(inputs_dir)
@@ -173,7 +182,7 @@ def run_trial(trial_dir, data, traj, sigma, theta, lcmdir,
                         weights_txt=weights_uniform, weighted=True)
 
     p_items = traj_items(traj)
-    rec_exp = rec_theta = False
+    minp_exp = minp_theta = float("inf")
 
     if want_exp:
         sig_exp = trial_dir / "pvalues_exp.csv"
@@ -186,7 +195,7 @@ def run_trial(trial_dir, data, traj, sigma, theta, lcmdir,
             "--mc_cutoff", str(mc_cutoff), "--mc_samples", str(mc_samples),
             "--seed", str(seed),
         ])
-        rec_exp = _recovered(sig_exp, p_items, "pval_exp", delta_exp)
+        minp_exp = _min_p_containing(sig_exp, p_items, "pval_exp")
 
     if want_theta:
         # theta-maximal family
@@ -208,29 +217,35 @@ def run_trial(trial_dir, data, traj, sigma, theta, lcmdir,
                 "--mc_cutoff", str(mc_cutoff), "--mc_samples", str(mc_samples),
                 "--seed", str(seed),
             ])
-            rec_theta = _recovered(sig_theta, p_items, "pval_theta", delta_theta)
+            minp_theta = _min_p_containing(sig_theta, p_items, "pval_theta")
 
-    return rec_exp, rec_theta
+    return minp_exp, minp_theta
 
 
 # =====================================================================
-# WY threshold on a background-only null cohort (calibrated once)
+# WY threshold from the resamples of one cohort
 # =====================================================================
 def calibrate_threshold(null_dir, rng, n_patients, M, bg_labels, traj, sigma, theta,
                         lcmdir, null_model, mc_cutoff, mc_samples, wy_M, alpha,
-                        par, seed, test, verbose=False):
-    """Build a global-null cohort and derive delta_hat(alpha) via WY.
+                        par, seed, test, verbose=False, N=0, f=0.0):
+    """Build one cohort and derive delta_hat(alpha) via WY on its resamples.
 
-    The null cohort has no carriers (f = 0), so every patient carries the
-    trajectory alterations but always scrambled: presence and co-occurrence
-    match the real cohort, and no conserved order is present anywhere. This is
-    the correct null for the design in which non-carriers also carry the X
-    alterations."""
+    With N = 0 (calibration "global") the cohort has no carriers, so every
+    patient carries the trajectory alterations but always scrambled: presence
+    and co-occurrence match the implanted cohorts, and no conserved order is
+    present anywhere. With N > 0 (calibration "cell") the cohort is an implanted
+    cohort of the (N, f) cell, and each resample relabels every patient,
+    carriers included, as the per-patient null of the real pipeline does: the
+    agreeing trees of the carriers then make chance consensus more likely in the
+    resamples too, which a carrier-free cohort misses.
+
+    Returns (delta_exp, delta_theta, sorted exp minima, sorted theta minima)."""
     ensure_dir(null_dir)
     inputs_dir = null_dir / "inputs"
     ensure_dir(inputs_dir)
+    carriers = rng.choice(n_patients, size=N, replace=False) if N else set()
     data = build_cohort(rng, n_patients, M, traj=traj, bg_labels=bg_labels,
-                        carriers=set(), f=0.0)
+                        carriers=carriers, f=f)
     graphs_all, weights_uniform, owner_txt, _ = build_inputs(
         list(data), inputs_dir, seed=seed)
 
@@ -258,7 +273,7 @@ def calibrate_threshold(null_dir, rng, n_patients, M, bg_labels, traj, sigma, th
     min_theta = sorted(_min(pv) for _, _, pv in results)
     d_exp = wy_threshold(min_exp, alpha, wy_M) if min_exp else 0.0
     d_theta = wy_threshold(min_theta, alpha, wy_M) if min_theta else 0.0
-    return d_exp, d_theta
+    return d_exp, d_theta, min_exp, min_theta
 
 
 def main():
@@ -276,7 +291,11 @@ def main():
     ap.add_argument("--test", choices=["exp", "theta", "both"], default="both")
     ap.add_argument("--n_trials", type=int, default=50)
     ap.add_argument("--wy_M", type=int, default=200,
-                    help="resamples for the one-off WY threshold calibration")
+                    help="resamples per WY threshold calibration")
+    ap.add_argument("--calibration", choices=["global", "cell"], default="global",
+                    help="global: one WY threshold from a carrier-free cohort, "
+                         "reused in every cell; cell: one threshold per (N, f), "
+                         "from the resamples of an implanted cohort of that cell")
     ap.add_argument("--mc_cutoff", type=int, default=8)
     ap.add_argument("--mc_samples", type=int, default=2000)
     ap.add_argument("--lcmdir", default="./lcm53")
@@ -308,86 +327,117 @@ def main():
 
     print(f"[POW] n_patients={args.n_patients} M={args.M} k={args.k} "
           f"theta={args.theta} sigma={args.sigma} alpha={args.alpha}")
-    print(f"[POW] N_list={N_list} f_list={f_list} trials={args.n_trials}")
+    print(f"[POW] N_list={N_list} f_list={f_list} trials={args.n_trials} "
+          f"calibration={args.calibration} wy_M={args.wy_M}")
 
-    # Calibrate the WY threshold once on a background-only cohort (cached).
-    thr_path = outdir / "_null" / "thresholds.json"
-    if thr_path.exists():
-        thr = json.loads(thr_path.read_text())
-        delta_exp, delta_theta = thr["delta_exp"], thr["delta_theta"]
-        print(f"[POW] WY thresholds loaded from cache {thr_path}")
-    else:
-        cal_rng = np.random.default_rng(args.seed + 999)
-        delta_exp, delta_theta = calibrate_threshold(
-            outdir / "_null", cal_rng, args.n_patients, args.M, bg_labels, traj,
-            args.sigma, args.theta, lcmdir, args.null, args.mc_cutoff,
-            args.mc_samples, args.wy_M, args.alpha, args.par, args.seed,
-            test=args.test, verbose=args.verbose)
-        ensure_dir(thr_path.parent)
-        thr_path.write_text(json.dumps(
-            {"delta_exp": delta_exp, "delta_theta": delta_theta}))
-    print(f"[POW] WY thresholds @ alpha={args.alpha}: "
-          f"delta_exp={delta_exp:.3e} delta_theta={delta_theta:.3e}")
+    def _thresholds(N, f):
+        """WY thresholds of cell (N, f), cached on disk. 'global' calibrates
+        once, on a carrier-free cohort; 'cell' once per (N, f), on an implanted
+        cohort of that cell drawn from a seed fixed by (N, f). Neither the cohort
+        nor its resamples depend on theta, so the exp threshold of a cell is the
+        same in the theta = 0.5 and theta = 1 runs."""
+        if args.calibration == "global":
+            cal_dir, N_cal, f_cal = outdir / "_null", 0, 0.0
+            cal_rng = np.random.default_rng(args.seed + 999)
+        else:
+            cal_dir = outdir / f"_cal_m{args.wy_M}" / f"N{N}_f{f:g}"
+            N_cal, f_cal = N, f
+            cal_rng = np.random.default_rng(
+                [args.seed, 999, N, int(round(f * args.M))])
+        thr_path = cal_dir / "thresholds.json"
+        if thr_path.exists():
+            thr = json.loads(thr_path.read_text())
+        else:
+            d_exp, d_theta, min_exp, min_theta = calibrate_threshold(
+                cal_dir, cal_rng, args.n_patients, args.M, bg_labels, traj,
+                args.sigma, args.theta, lcmdir, args.null, args.mc_cutoff,
+                args.mc_samples, args.wy_M, args.alpha, args.par, args.seed,
+                test=args.test, verbose=args.verbose, N=N_cal, f=f_cal)
+            # the minima are kept so the threshold can be recomputed offline
+            # at another alpha
+            thr = {"delta_exp": d_exp, "delta_theta": d_theta,
+                   "wy_M": args.wy_M, "min_exp": min_exp, "min_theta": min_theta}
+            thr_path.write_text(json.dumps(thr))
+            print(f"[POW] WY thresholds @ alpha={args.alpha} ({cal_dir.name}): "
+                  f"delta_exp={d_exp:.3e} delta_theta={d_theta:.3e}", flush=True)
+        return thr["delta_exp"], thr["delta_theta"]
 
     rng = np.random.default_rng(args.seed)
     out_csv = outdir / "recall.csv"
     rows = []
-    done = set()
-    if out_csv.exists():
-        for r in csv.DictReader(open(out_csv)):
-            rows.append(r)
-            done.add((int(r["N"]), float(r["f"])))
-        print(f"[POW] resume: {len(done)} (N,f) cells already done")
+
+    # Per-trial smallest p-value of a tested trajectory containing P: the
+    # recall of a cell follows from these and its thresholds, so a cell whose
+    # trials are cached is not rerun (resume, or a recalibration with another
+    # wy_M or --calibration on the same trials).
+    trials_csv = outdir / "trials.csv"
+    trial_fields = ["N", "f", "trial", "minp_exp", "minp_theta"]
+    trials = {}
+    if trials_csv.exists():
+        for r in csv.DictReader(open(trials_csv)):
+            trials.setdefault((int(r["N"]), float(r["f"])), []).append(r)
+        print(f"[POW] trials cached for {len(trials)} (N,f) cells")
 
     def _flush():
         with out_csv.open("w", newline="") as fcsv:
             w = csv.DictWriter(fcsv, fieldnames=["N", "f", "test", "recall"])
             w.writeheader()
             w.writerows(rows)
+        with trials_csv.open("w", newline="") as fcsv:
+            w = csv.DictWriter(fcsv, fieldnames=trial_fields)
+            w.writeheader()
+            for cell_rows in trials.values():
+                w.writerows(cell_rows)
 
     step = max(1, args.n_trials // 4)
     for N in N_list:
         for f in f_list:
-            if (N, f) in done:
-                print(f"[POW] N={N} f={f:.2f}  [SKIP] already done")
-                continue
+            delta_exp, delta_theta = _thresholds(N, f)
             # The cohorts are drawn here, in trial order, from the one shared
-            # rng, so the random stream (and every result) is the same with or
-            # without --par; only mining + scoring run in parallel.
+            # rng, also for a cached cell, so the random stream (and every
+            # result) is the same with or without --par or a resume; only
+            # mining + scoring run in parallel.
             tasks = []
             for t in range(args.n_trials):
                 carriers = rng.choice(args.n_patients, size=N, replace=False)
                 data = build_cohort(rng, args.n_patients, args.M, traj,
                                     bg_labels, carriers, f)
                 tasks.append((outdir / f"trials/N{N}_f{f}/t{t}", data, traj,
-                              args.sigma, args.theta, lcmdir, delta_exp,
-                              delta_theta, args.null, args.mc_cutoff,
-                              args.mc_samples, args.seed + t, want_exp, want_theta))
-            n_exp = n_theta = 0
-            if args.par > 1:
-                with Pool(args.par) as pool:
-                    flags = pool.imap_unordered(_trial_worker, tasks)
-                    for done_t, (rec_e, rec_t) in enumerate(flags, 1):
-                        n_exp += int(rec_e)
-                        n_theta += int(rec_t)
-                        if done_t % step == 0:
-                            print(f"[POW]   N={N} f={f:.2f}  trial {done_t}/{args.n_trials}",
-                                  flush=True)
+                              args.sigma, args.theta, lcmdir, args.null,
+                              args.mc_cutoff, args.mc_samples, args.seed + t,
+                              want_exp, want_theta))
+            cached = trials.get((N, f), [])
+            if len(cached) == args.n_trials:
+                minp = [(float(r["minp_exp"]), float(r["minp_theta"]))
+                        for r in sorted(cached, key=lambda r: int(r["trial"]))]
+                print(f"[POW] N={N} f={f:.2f}  trials loaded from cache")
             else:
-                for t, task in enumerate(tasks):
-                    rec_e, rec_t = _trial_worker(task)
-                    n_exp += int(rec_e)
-                    n_theta += int(rec_t)
-                    if (t + 1) % step == 0:
-                        print(f"[POW]   N={N} f={f:.2f}  trial {t+1}/{args.n_trials}",
-                              flush=True)
+                minp = []
+                if args.par > 1:
+                    with Pool(args.par) as pool:
+                        for done_t, res in enumerate(
+                                pool.imap(_trial_worker, tasks), 1):
+                            minp.append(res)
+                            if done_t % step == 0:
+                                print(f"[POW]   N={N} f={f:.2f}  trial {done_t}/{args.n_trials}",
+                                      flush=True)
+                else:
+                    for t, task in enumerate(tasks):
+                        minp.append(_trial_worker(task))
+                        if (t + 1) % step == 0:
+                            print(f"[POW]   N={N} f={f:.2f}  trial {t+1}/{args.n_trials}",
+                                  flush=True)
+                trials[(N, f)] = [
+                    {"N": N, "f": f, "trial": t, "minp_exp": e, "minp_theta": th}
+                    for t, (e, th) in enumerate(minp)]
+            n_exp = sum(e <= delta_exp for e, _ in minp)
+            n_theta = sum(th <= delta_theta for _, th in minp)
             if want_exp:
                 rows.append({"N": N, "f": f, "test": "exp",
                              "recall": f"{n_exp / args.n_trials:.4f}"})
             if want_theta:
                 rows.append({"N": N, "f": f, "test": "theta",
                              "recall": f"{n_theta / args.n_trials:.4f}"})
-            done.add((N, f))
             _flush()          # persist after every (N,f) so a crash can resume
             print(f"[POW] N={N} f={f:.2f}  "
                   f"recall_exp={n_exp/args.n_trials:.2f}  "
