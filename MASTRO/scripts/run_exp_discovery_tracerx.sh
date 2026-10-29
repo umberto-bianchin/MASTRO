@@ -38,6 +38,9 @@ EXACT_SIG=(); EXACT_WY=()
 if [ "$EXACT_WHEN_CHEAPER" = 1 ]; then
   EXACT_SIG=(--sig_exact_when_cheaper); EXACT_WY=(--exact_when_cheaper)
 fi
+WEIGHTS=${WEIGHTS:-}             # per-tree weights file (run_pipeline.py --weights); empty = uniform
+WEIGHTS_ARG=()
+[ -n "$WEIGHTS" ] && WEIGHTS_ARG=(--weights "$WEIGHTS")
 MIN_MINE_ARG=()
 [ -n "$MIN_MINE_SIGMA" ] && MIN_MINE_ARG=(--min_mine_sigma "$MIN_MINE_SIGMA")
 
@@ -56,6 +59,7 @@ for SIGMA in $SIGMA_LIST; do
     --significance --sig_null "$NULL" \
     --sig_mc_cutoff "$MC_CUTOFF" --sig_mc_samples "$MC_SAMPLES" --sig_n_jobs "$PAR" \
     ${EXACT_SIG[@]+"${EXACT_SIG[@]}"} \
+    ${WEIGHTS_ARG[@]+"${WEIGHTS_ARG[@]}"} \
     --outdir "$OUT"
 
   SIGDIR="$OUT/significance"
@@ -68,7 +72,7 @@ for SIGMA in $SIGMA_LIST; do
     echo "=== [2] WY/FDR: sigma=$SIGMA theta=$THETA M=$M par=$PAR null=$NULL ==="
     python3 run_wy_correction_ensemble.py \
       --graphs_all "$OUT/inputs/graphs_all.txt" \
-      -w           "$OUT/inputs/weights_uniform.txt" \
+      -w           "$OUT/inputs/weights.txt" \
       --owner      "$OUT/inputs/owner.txt" \
       --sigma      "$SIGMA" -M "$M" \
       --test both --null "$NULL" --theta "$THETA" --par "$PAR" \

@@ -49,7 +49,10 @@ from utils import (
     run_lcm,
     read_result_itemsets,
     compute_dataset_stats,
+    read_floats,
+    load_weights_and_owner,
 )
+import shutil
 
 # -------------------------
 # Run pipelines
@@ -287,6 +290,13 @@ def main():
     ap.add_argument("--owner", default=None,
                     help="Owner file for --graphs mode: one patient-ID per line (same #lines as graphs). "
                          "If omitted, each line is treated as a separate patient (1 tree per patient)")
+    ap.add_argument("--weights", default=None,
+                    help="Per-tree weights, one float per line in the order of "
+                         "inputs/graphs_all.txt (patients in input order, each "
+                         "patient's trees in order; a patient without trees "
+                         "contributes no line). The weights of each patient must "
+                         "be >= 0 and sum to 1. Default: uniform 1/M_i. The "
+                         "weights actually used are written to inputs/weights.txt")
     ap.add_argument("--sigma", type=int, default=10, help="Support threshold sigma")
     ap.add_argument("--seed", type=int, default=0, help="Random seed for picking one tree per patient")
     ap.add_argument("--theta_list", default="0.25,0.5,0.75,1.0", help="Comma-separated list of theta values")
@@ -454,6 +464,28 @@ def main():
         (outdir / "dataset_stats.json").write_text(json.dumps(stats, indent=2))
         print(f"[OK] Loaded {n_lines} transactions for {n_patients} patients from {graphs_src.name}")
 
+    # Per-tree weights: uniform unless --weights is given. The weights actually
+    # used are written to inputs/weights.txt, which the run scripts pass to the
+    # WY step so that the observed and the null families use the same weights
+    weights_txt = inputs_dir / "weights.txt"
+    if args.weights:
+        w = read_floats(Path(args.weights))
+        _, owner0, n_pat, K = load_weights_and_owner(weights_uniform, owner_txt)
+        if len(w) != K:
+            ap.error(f"--weights has {len(w)} lines but the input has {K} trees")
+        if min(w) < 0:
+            ap.error("--weights must be >= 0")
+        tot = [0.0] * n_pat
+        for t, x in enumerate(w):
+            tot[owner0[t]] += x
+        bad = sorted(i for i in set(owner0) if abs(tot[i] - 1.0) > 1e-6)
+        if bad:
+            ap.error(f"--weights of {len(bad)} patients do not sum to 1 "
+                     f"(e.g. patient {bad[0]}: {tot[bad[0]]:.6f})")
+        weights_txt.write_text("".join(f"{x!r}\n" for x in w))
+    else:
+        shutil.copyfile(weights_uniform, weights_txt)
+
     runs_dir = outdir / "runs"
     ensure_dir(runs_dir)
 
@@ -483,7 +515,7 @@ def main():
             lcmdir=lcmdir,
             workdir=alg1_dir,
             tag="expected_uniform",
-            weights_txt=weights_uniform,
+            weights_txt=weights_txt,
             weighted=True
         )
 
@@ -521,14 +553,14 @@ def main():
                         lcmdir=lcmdir,
                         workdir=low_dir,
                         tag=f"expected_uniform_sig{sigma_c}",
-                        weights_txt=weights_uniform,
+                        weights_txt=weights_txt,
                         weighted=True
                     )
                 cand = alg1_low_cache[sigma_c]
 
             a2, a3 = run_postfilters(
                 expected_filtered=cand,
-                weights_txt=weights_uniform,
+                weights_txt=weights_txt,
                 owner_txt=owner_txt,
                 theta=th,
                 st=sigma,
@@ -565,7 +597,7 @@ def main():
             npy_sampled_path=npy_sampled_path,
             graphs_all_path=graphs_all_path,
             graphs_sampled_path=graphs_sampled_path,
-            weights_txt=weights_uniform,
+            weights_txt=weights_txt,
             owner_txt=owner_txt,
             weights_sampled_txt=weights_sampled_txt,
             owner_sampled_txt=owner_sampled_txt,
