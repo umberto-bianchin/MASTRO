@@ -42,8 +42,17 @@ K_MIN=${K_MIN:-2}                            # POTTR recurrence levels to sweep;
 K_MAX=${K_MAX:-50}                           #   K_LIST defaults to K_MIN..K_MAX
 K_LIST=${K_LIST:-"$(seq "$K_MIN" "$K_MAX" | tr '\n' ' ')"}
 CORES=${CORES:-20}
+# >0: Gurobi solution pool of this size (the POTTR paper uses 50000), run
+# through pottr_pool_logged.py, which also writes k<k>/pool_log.json
+POOL=${POOL:-0}
 FORCE_POTTR_SIG=${FORCE_POTTR_SIG:-1}        # 1 = re-apply run_POTTR's significance
 POTTR_SIG_MAX_NODES=${POTTR_SIG_MAX_NODES:-6} #   gate per trajectory, not per k
+# 1 = DAGS_DIR and ENS_DIR already hold a matched cohort (run_pottr_tracerx.sh)
+SKIP_PREP=${SKIP_PREP:-0}
+# 1 = keep POTTR's '-?-' pairs as same-node relations (TRACERx encoding)
+KEEP_CLUSTER=${KEEP_CLUSTER:-0}
+MC_SAMPLES=${MC_SAMPLES:-2000}               # patients above 8 trees only; the capped
+EXACT_WHEN_CHEAPER=${EXACT_WHEN_CHEAPER:-0}  #   breast cohort has none
 THETA=${THETA:-1.0}
 NULL=${NULL:-perm}
 SEED=${SEED:-0}
@@ -52,10 +61,14 @@ MT_FLAG=""
 [ "$MULTITREE_ONLY" = "1" ] && MT_FLAG="--multitree_only"
 
 # ---- (A) build matched, tractable cohort ------------------------------------
-echo "=== (A) prepare matched POTTR + ensemble cohort ==="
-python3 breastcancer_to_pottr.py \
-  --npy "$NPY" --out "$DAGS_DIR" --ensemble_out "$ENS_DIR" \
-  --max_trees "$MAX_TREES" --n_patients "$N_PATIENTS" $MT_FLAG --seed "$SEED"
+if [ "$SKIP_PREP" = "1" ]; then
+  echo "=== (A) using prebuilt cohort: dags=$DAGS_DIR inputs=$ENS_DIR ==="
+else
+  echo "=== (A) prepare matched POTTR + ensemble cohort ==="
+  python3 breastcancer_to_pottr.py \
+    --npy "$NPY" --out "$DAGS_DIR" --ensemble_out "$ENS_DIR" \
+    --max_trees "$MAX_TREES" --n_patients "$N_PATIENTS" $MT_FLAG --seed "$SEED"
+fi
 
 # absolute paths for POTTR (run from POTTR/code with a different CWD)
 DAGS_ABS="$(cd "$(dirname "$DAGS_DIR")" && pwd)/$(basename "$DAGS_DIR")"
@@ -88,8 +101,14 @@ for K in $K_LIST; do
     continue
   fi
   echo "--- POTTR k=$K -> ${KOUT} ---"
-  ( cd "${POTTR_REPO}/code" && \
-    python3 run_POTTR.py -o "$KOUT" -d "$DAGS_ABS" -k "$K" -c "$CORES" -parallel )
+  if [ "$POOL" -gt 0 ]; then
+    ( cd "${POTTR_REPO}/code" && \
+      python3 "${MASTRO_DIR}/pottr_pool_logged.py" --pool_log "${KOUT}/pool_log.json" \
+        -o "$KOUT" -d "$DAGS_ABS" -k "$K" -c "$CORES" -parallel -pool "$POOL" )
+  else
+    ( cd "${POTTR_REPO}/code" && \
+      python3 run_POTTR.py -o "$KOUT" -d "$DAGS_ABS" -k "$K" -c "$CORES" -parallel )
+  fi
 done
 
 KMIN=$(echo $K_LIST | tr ' ' '\n' | sort -n | head -1)
@@ -119,6 +138,9 @@ python3 pottr_significance.py \
   --graphs_all "${ENS_DIR}/graphs_all.txt" \
   -w "${ENS_DIR}/weights_uniform.txt" --owner "${ENS_DIR}/owner.txt" \
   --theta "$THETA" --null "$NULL" --n_jobs "$CORES" --seed "$SEED" \
+  --mc_samples "$MC_SAMPLES" \
+  $( [ "$EXACT_WHEN_CHEAPER" = 1 ] && echo --exact_when_cheaper ) \
+  $( [ "$KEEP_CLUSTER" = 1 ] && echo --keep_cluster ) \
   --out "$SIG_OUT"
 
 # ---- (D) figure ------------------------------------------------------------
