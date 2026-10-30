@@ -1,0 +1,68 @@
+{
+ "max_size": 3,
+ "pool_size": 50000,
+ "sol_count": 50000,
+ "n_optimal": 50000,
+ "pool_full": true,
+ "n_node_sets": 3,
+ "n_trajectories": 4,
+ "trajectories": [
+  {
+   "nodes": [
+    "0",
+    "KEAP1_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "KEAP1_M->-TP53_M"
+   ],
+   "n_solutions": 45369,
+   "kept_by_pottr": true,
+   "n_trees_seen": 15,
+   "n_patients_seen": 15
+  },
+  {
+   "nodes": [
+    "0",
+    "KRAS_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "KRAS_M->-TP53_M"
+   ],
+   "n_solutions": 3866,
+   "kept_by_pottr": false,
+   "n_trees_seen": 34,
+   "n_patients_seen": 34
+  },
+  {
+   "nodes": [
+    "0",
+    "KRAS_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-KRAS_M"
+   ],
+   "n_solutions": 672,
+   "kept_by_pottr": true,
+   "n_trees_seen": 30,
+   "n_patients_seen": 30
+  },
+  {
+   "nodes": [
+    "0",
+    "PIK3CA_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-PIK3CA_M"
+   ],
+   "n_solutions": 93,
+   "kept_by_pottr": true,
+   "n_trees_seen": 18,
+   "n_patients_seen": 15
+  }
+ ],
+ "k": 15
+}

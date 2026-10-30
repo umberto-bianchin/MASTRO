@@ -1,0 +1,32 @@
+{
+ "max_size": 6,
+ "pool_size": 50000,
+ "sol_count": 50000,
+ "n_optimal": 50000,
+ "pool_full": true,
+ "n_node_sets": 1,
+ "n_trajectories": 1,
+ "trajectories": [
+  {
+   "nodes": [
+    "0",
+    "CREBBP_M",
+    "FAT1_M",
+    "IKZF1_M",
+    "KMT2D_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "CREBBP_M->-KMT2D_M",
+    "FAT1_M->-KMT2D_M",
+    "IKZF1_M->-KMT2D_M",
+    "TP53_M->-KMT2D_M"
+   ],
+   "n_solutions": 50000,
+   "kept_by_pottr": true,
+   "n_trees_seen": 2,
+   "n_patients_seen": 2
+  }
+ ],
+ "k": 2
+}

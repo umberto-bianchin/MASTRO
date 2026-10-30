@@ -1,0 +1,326 @@
+{
+ "max_size": 3,
+ "pool_size": 50000,
+ "sol_count": 50000,
+ "n_optimal": 49999,
+ "pool_full": true,
+ "n_node_sets": 17,
+ "n_trajectories": 23,
+ "trajectories": [
+  {
+   "nodes": [
+    "0",
+    "FAT1_N",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-FAT1_N"
+   ],
+   "n_solutions": 16446,
+   "kept_by_pottr": true,
+   "n_trees_seen": 12,
+   "n_patients_seen": 12
+  },
+  {
+   "nodes": [
+    "0",
+    "FAT1_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-FAT1_M"
+   ],
+   "n_solutions": 12924,
+   "kept_by_pottr": true,
+   "n_trees_seen": 15,
+   "n_patients_seen": 14
+  },
+  {
+   "nodes": [
+    "0",
+    "KRAS_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "KRAS_M->-TP53_M"
+   ],
+   "n_solutions": 3942,
+   "kept_by_pottr": true,
+   "n_trees_seen": 35,
+   "n_patients_seen": 35
+  },
+  {
+   "nodes": [
+    "0",
+    "PIK3CA_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-PIK3CA_M"
+   ],
+   "n_solutions": 3942,
+   "kept_by_pottr": true,
+   "n_trees_seen": 19,
+   "n_patients_seen": 15
+  },
+  {
+   "nodes": [
+    "0",
+    "CDKN2A_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-CDKN2A_M"
+   ],
+   "n_solutions": 1980,
+   "kept_by_pottr": false,
+   "n_trees_seen": 17,
+   "n_patients_seen": 14
+  },
+  {
+   "nodes": [
+    "0",
+    "KMT2D_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-KMT2D_M"
+   ],
+   "n_solutions": 1936,
+   "kept_by_pottr": true,
+   "n_trees_seen": 13,
+   "n_patients_seen": 13
+  },
+  {
+   "nodes": [
+    "0",
+    "NFE2L2_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-NFE2L2_M"
+   ],
+   "n_solutions": 1924,
+   "kept_by_pottr": true,
+   "n_trees_seen": 16,
+   "n_patients_seen": 14
+  },
+  {
+   "nodes": [
+    "0",
+    "ATM_M",
+    "KRAS_M"
+   ],
+   "edges": [
+    "KRAS_M->-ATM_M"
+   ],
+   "n_solutions": 1345,
+   "kept_by_pottr": true,
+   "n_trees_seen": 12,
+   "n_patients_seen": 11
+  },
+  {
+   "nodes": [
+    "0",
+    "KRAS_M",
+    "STK11_N"
+   ],
+   "edges": [],
+   "n_solutions": 1230,
+   "kept_by_pottr": true,
+   "n_trees_seen": 21,
+   "n_patients_seen": 14
+  },
+  {
+   "nodes": [
+    "0",
+    "KRAS_M",
+    "STK11_M"
+   ],
+   "edges": [
+    "STK11_M->-KRAS_M"
+   ],
+   "n_solutions": 1008,
+   "kept_by_pottr": false,
+   "n_trees_seen": 15,
+   "n_patients_seen": 11
+  },
+  {
+   "nodes": [
+    "0",
+    "CDKN2A_M",
+    "TP53_M"
+   ],
+   "edges": [],
+   "n_solutions": 984,
+   "kept_by_pottr": true,
+   "n_trees_seen": 17,
+   "n_patients_seen": 13
+  },
+  {
+   "nodes": [
+    "0",
+    "KEAP1_M",
+    "KRAS_M"
+   ],
+   "edges": [
+    "KEAP1_M->-KRAS_M"
+   ],
+   "n_solutions": 968,
+   "kept_by_pottr": true,
+   "n_trees_seen": 17,
+   "n_patients_seen": 11
+  },
+  {
+   "nodes": [
+    "0",
+    "TP53_M",
+    "UBR5_M"
+   ],
+   "edges": [
+    "TP53_M->-UBR5_M"
+   ],
+   "n_solutions": 912,
+   "kept_by_pottr": true,
+   "n_trees_seen": 13,
+   "n_patients_seen": 13
+  },
+  {
+   "nodes": [
+    "0",
+    "CDKN2A_N",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-CDKN2A_N"
+   ],
+   "n_solutions": 437,
+   "kept_by_pottr": true,
+   "n_trees_seen": 14,
+   "n_patients_seen": 14
+  },
+  {
+   "nodes": [
+    "0",
+    "KRAS_M",
+    "TP53_M"
+   ],
+   "edges": [],
+   "n_solutions": 6,
+   "kept_by_pottr": false,
+   "n_trees_seen": 26,
+   "n_patients_seen": 26
+  },
+  {
+   "nodes": [
+    "0",
+    "KEAP1_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "KEAP1_M->-TP53_M"
+   ],
+   "n_solutions": 5,
+   "kept_by_pottr": true,
+   "n_trees_seen": 15,
+   "n_patients_seen": 15
+  },
+  {
+   "nodes": [
+    "0",
+    "KRAS_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-KRAS_M"
+   ],
+   "n_solutions": 3,
+   "kept_by_pottr": false,
+   "n_trees_seen": 13,
+   "n_patients_seen": 13
+  },
+  {
+   "nodes": [
+    "0",
+    "STK11_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-STK11_M"
+   ],
+   "n_solutions": 2,
+   "kept_by_pottr": true,
+   "n_trees_seen": 13,
+   "n_patients_seen": 12
+  },
+  {
+   "nodes": [
+    "0",
+    "KMT2D_N",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-KMT2D_N"
+   ],
+   "n_solutions": 1,
+   "kept_by_pottr": true,
+   "n_trees_seen": 11,
+   "n_patients_seen": 11
+  },
+  {
+   "nodes": [
+    "0",
+    "CREBBP_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-CREBBP_M"
+   ],
+   "n_solutions": 1,
+   "kept_by_pottr": true,
+   "n_trees_seen": 11,
+   "n_patients_seen": 11
+  },
+  {
+   "nodes": [
+    "0",
+    "CDKN2A_N",
+    "TP53_M"
+   ],
+   "edges": [],
+   "n_solutions": 1,
+   "kept_by_pottr": false,
+   "n_trees_seen": 12,
+   "n_patients_seen": 12
+  },
+  {
+   "nodes": [
+    "0",
+    "PIK3CA_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "PIK3CA_M->-TP53_M"
+   ],
+   "n_solutions": 1,
+   "kept_by_pottr": false,
+   "n_trees_seen": 11,
+   "n_patients_seen": 11
+  },
+  {
+   "nodes": [
+    "0",
+    "KRAS_M",
+    "STK11_M"
+   ],
+   "edges": [
+    "KRAS_M->-STK11_M"
+   ],
+   "n_solutions": 1,
+   "kept_by_pottr": true,
+   "n_trees_seen": 11,
+   "n_patients_seen": 11
+  }
+ ],
+ "k": 11
+}

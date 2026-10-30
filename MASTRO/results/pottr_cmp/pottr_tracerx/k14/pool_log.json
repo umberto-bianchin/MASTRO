@@ -1,0 +1,148 @@
+{
+ "max_size": 3,
+ "pool_size": 50000,
+ "sol_count": 50000,
+ "n_optimal": 49999,
+ "pool_full": true,
+ "n_node_sets": 8,
+ "n_trajectories": 10,
+ "trajectories": [
+  {
+   "nodes": [
+    "0",
+    "FAT1_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-FAT1_M"
+   ],
+   "n_solutions": 37720,
+   "kept_by_pottr": true,
+   "n_trees_seen": 15,
+   "n_patients_seen": 14
+  },
+  {
+   "nodes": [
+    "0",
+    "PIK3CA_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-PIK3CA_M"
+   ],
+   "n_solutions": 11642,
+   "kept_by_pottr": true,
+   "n_trees_seen": 19,
+   "n_patients_seen": 15
+  },
+  {
+   "nodes": [
+    "0",
+    "KEAP1_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "KEAP1_M->-TP53_M"
+   ],
+   "n_solutions": 426,
+   "kept_by_pottr": true,
+   "n_trees_seen": 15,
+   "n_patients_seen": 15
+  },
+  {
+   "nodes": [
+    "0",
+    "KRAS_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "KRAS_M->-TP53_M"
+   ],
+   "n_solutions": 186,
+   "kept_by_pottr": false,
+   "n_trees_seen": 35,
+   "n_patients_seen": 35
+  },
+  {
+   "nodes": [
+    "0",
+    "KRAS_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-KRAS_M"
+   ],
+   "n_solutions": 16,
+   "kept_by_pottr": true,
+   "n_trees_seen": 31,
+   "n_patients_seen": 31
+  },
+  {
+   "nodes": [
+    "0",
+    "KRAS_M",
+    "TP53_M"
+   ],
+   "edges": [],
+   "n_solutions": 2,
+   "kept_by_pottr": false,
+   "n_trees_seen": 24,
+   "n_patients_seen": 24
+  },
+  {
+   "nodes": [
+    "0",
+    "CDKN2A_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-CDKN2A_M"
+   ],
+   "n_solutions": 2,
+   "kept_by_pottr": true,
+   "n_trees_seen": 15,
+   "n_patients_seen": 14
+  },
+  {
+   "nodes": [
+    "0",
+    "KRAS_M",
+    "STK11_N"
+   ],
+   "edges": [],
+   "n_solutions": 2,
+   "kept_by_pottr": true,
+   "n_trees_seen": 15,
+   "n_patients_seen": 14
+  },
+  {
+   "nodes": [
+    "0",
+    "NFE2L2_M",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-NFE2L2_M"
+   ],
+   "n_solutions": 2,
+   "kept_by_pottr": true,
+   "n_trees_seen": 16,
+   "n_patients_seen": 14
+  },
+  {
+   "nodes": [
+    "0",
+    "CDKN2A_N",
+    "TP53_M"
+   ],
+   "edges": [
+    "TP53_M->-CDKN2A_N"
+   ],
+   "n_solutions": 1,
+   "kept_by_pottr": true,
+   "n_trees_seen": 14,
+   "n_patients_seen": 14
+  }
+ ],
+ "k": 14
+}

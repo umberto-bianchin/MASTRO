@@ -1,0 +1,28 @@
+{
+ "max_size": 4,
+ "pool_size": 50000,
+ "sol_count": 50000,
+ "n_optimal": 50000,
+ "pool_full": true,
+ "n_node_sets": 1,
+ "n_trajectories": 1,
+ "trajectories": [
+  {
+   "nodes": [
+    "0",
+    "KRAS_M",
+    "MGA_N",
+    "TP53_M"
+   ],
+   "edges": [
+    "KRAS_M->-MGA_N",
+    "TP53_M->-MGA_N"
+   ],
+   "n_solutions": 50000,
+   "kept_by_pottr": true,
+   "n_trees_seen": 5,
+   "n_patients_seen": 5
+  }
+ ],
+ "k": 5
+}
