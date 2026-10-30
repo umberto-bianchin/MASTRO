@@ -11,7 +11,10 @@ is evaluated on its own recomputed occurrences?
 
 For each POTTR trajectory we keep only its *resolved* order relations
 (``a->-b`` and, if present, ``a-/-b``), dropping the germline root ``0`` and the
-unresolved ``-?-`` pairs, which make no ordering claim. We then recompute the
+unresolved ``-?-`` pairs, which make no ordering claim. With ``--keep_cluster``
+the ``-?-`` pairs are kept instead: in the TRACERx input ``-?-`` means "same
+clone" (create_tracerx_trees.py), and a POTTR cluster pair it did not resolve
+is still a same-clone claim on every tree that supports the trajectory. We then recompute the
 trajectory's occurrences directly in the ensemble transaction database and run
 ``compute_significance_ensemble.py --allow-incomplete`` on the resulting
 (incomplete) pattern, so only the relations POTTR actually commits to constrain
@@ -59,19 +62,26 @@ def endpoints(item):
     return None
 
 
-def resolved_relations(items):
+def resolved_relations(items, keep_cluster=False):
     """Keep only the resolved (ordered/incomparable) relations among non-root
-    nodes; drop '-?-' (unresolved) and anything touching the root '0'."""
+    nodes; drop '-?-' (unresolved) and anything touching the root '0'.
+    keep_cluster keeps '-?-' as a same-node relation, endpoints sorted as in
+    graphs_all.txt (POTTR writes the pair in either order, sometimes both)."""
     keep = []
     for it in items:
         ep = endpoints(it)
         if ep is None:
             continue
         a, sep, b = ep
-        if sep == "-?-":
-            continue
         if a == ROOT_LABEL or b == ROOT_LABEL:
             continue
+        if sep == "-?-":
+            if not keep_cluster:
+                continue
+            a, b = sorted((a, b))
+            it = f"{a}-?-{b}"
+            if it in keep:
+                continue
         keep.append(it)
     return keep
 
@@ -159,6 +169,8 @@ def main():
     ap.add_argument("--null", choices=["perm", "indep"], default="perm")
     ap.add_argument("--mc_cutoff", type=int, default=8)
     ap.add_argument("--mc_samples", type=int, default=2000)
+    ap.add_argument("--exact_when_cheaper", action="store_true",
+                    help="exact above the cutoff when placements <= mc_samples")
     ap.add_argument("--n_jobs", type=int, default=1)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--pottr_sig_name", default="significance_output.txt",
@@ -167,6 +179,8 @@ def main():
                     help="extra POTTR significance file covering several k at "
                          "once (written by pottr_force_significance.py); used "
                          "for trajectories no per-k file scored")
+    ap.add_argument("--keep_cluster", action="store_true",
+                    help="keep '-?-' pairs as same-node relations (TRACERx encoding)")
     ap.add_argument("--out", required=True)
     args = ap.parse_args()
 
@@ -193,7 +207,7 @@ def main():
                 ep = endpoints(it)
                 if ep:
                     full_nodes.add(ep[0]); full_nodes.add(ep[2])
-            rel = resolved_relations(items)
+            rel = resolved_relations(items, args.keep_cluster)
             if not rel:
                 continue
             key = " ".join(sorted(rel))
@@ -244,7 +258,7 @@ def main():
         "--mc_cutoff", str(args.mc_cutoff), "--mc_samples", str(args.mc_samples),
         "--n_jobs", str(args.n_jobs), "--seed", str(args.seed),
         "--allow-incomplete",
-    ], check=True)
+    ] + (["--exact_when_cheaper"] if args.exact_when_cheaper else []), check=True)
 
     sig = {row["pattern"]: row for row in csv.DictReader(open(sig_csv))}
 
