@@ -111,6 +111,13 @@ for K in $K_LIST; do
   fi
 done
 
+# 1 = stop after the sweep: several instances can share POTTR_OUT with disjoint
+# K_LISTs, then one run with the full K_LIST skips every k and does B2-D once
+if [ "${SWEEP_ONLY:-0}" = "1" ]; then
+  echo "=== sweep only: done k in [$K_LIST] ==="
+  exit 0
+fi
+
 KMIN=$(echo $K_LIST | tr ' ' '\n' | sort -n | head -1)
 KMAX=$(echo $K_LIST | tr ' ' '\n' | sort -n | tail -1)
 
